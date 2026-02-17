@@ -20,6 +20,7 @@ from termcolor import colored
 from holosoma_inference.config.config_types.inference import InferenceConfig
 from holosoma_inference.config.config_types.robot import RobotConfig
 from holosoma_inference.sdk import create_interface
+from holosoma_inference.sdk.base.robot_state import RobotState
 from holosoma_inference.utils.latency import LatencyTracker
 from holosoma_inference.utils.math.quat import quat_rotate_inverse
 from holosoma_inference.utils.rate import RateLimiter
@@ -453,9 +454,9 @@ class BasePolicy:
                     start_idx += total_dim
         print("========================================\n")
 
-    def rl_inference(self, robot_state_data):
+    def rl_inference(self, robot_state: RobotState):
         """Perform RL inference to get policy action."""
-        obs = self.prepare_obs_for_rl(robot_state_data)
+        obs = self.prepare_obs_for_rl(robot_state)
         if self.config.task.print_observations:
             self._print_observations(obs)
 
@@ -471,25 +472,26 @@ class BasePolicy:
     # Observation Processing Methods
     # ============================================================================
 
-    def get_current_obs_buffer_dict(self, robot_state_data):
-        """Extract current observation data from robot state."""
+    def get_current_obs_buffer_dict(self, robot_state: RobotState):
+        """Extract current observation data from robot state.
+
+        Args:
+            robot_state: RobotState object containing all robot state information.
+
+        Returns:
+            Dictionary mapping observation term names to their values.
+        """
         current_obs_buffer_dict = {}
 
-        # Extract base and joint data
-        current_obs_buffer_dict["base_quat"] = robot_state_data[:, 3:7]
-        current_obs_buffer_dict["base_ang_vel"] = robot_state_data[:, 7 + self.num_dofs + 3 : 7 + self.num_dofs + 6]
-        current_obs_buffer_dict["dof_pos"] = robot_state_data[:, 7 : 7 + self.num_dofs] - self.default_dof_angles
-        current_obs_buffer_dict["dof_vel"] = robot_state_data[
-            :, 7 + self.num_dofs + 6 : 7 + self.num_dofs + 6 + self.num_dofs
-        ]
+        # Extract base and joint data from RobotState (no more brittle index slicing!)
+        current_obs_buffer_dict["base_quat"] = robot_state.base_orientation.reshape(1, -1)
+        current_obs_buffer_dict["base_ang_vel"] = robot_state.base_angular_velocity.reshape(1, -1)
+        current_obs_buffer_dict["dof_pos"] = robot_state.joint_positions.reshape(1, -1) - self.default_dof_angles
+        current_obs_buffer_dict["dof_vel"] = robot_state.joint_velocities.reshape(1, -1)
 
-        # Use pre-computed corrected gravity if available from interface, else compute
-        # This logic seems very brittle. TODO: Return a dataclass instead of just a numpy array.
-        expected_len = (
-            7 + self.num_dofs + 6 + self.num_dofs
-        )  # base_pos(3) + quat(4) + dof_pos + lin_vel(3) + ang_vel(3) + dof_vel
-        if robot_state_data.shape[1] == expected_len + 3:
-            current_obs_buffer_dict["projected_gravity"] = robot_state_data[:, expected_len : expected_len + 3]
+        # Use pre-computed projected gravity if available, else compute from quaternion
+        if robot_state.projected_gravity is not None:
+            current_obs_buffer_dict["projected_gravity"] = robot_state.projected_gravity.reshape(1, -1)
         else:
             v = np.array([[0, 0, -1]])
             current_obs_buffer_dict["projected_gravity"] = quat_rotate_inverse(current_obs_buffer_dict["base_quat"], v)
@@ -512,9 +514,9 @@ class BasePolicy:
             current_obs_dict[group] = grouped_terms
         return current_obs_dict
 
-    def _prepare_group_observations(self, robot_state_data):
+    def _prepare_group_observations(self, robot_state: RobotState):
         """Return flattened observations per group with history applied per term."""
-        current_obs_buffer_dict = self.get_current_obs_buffer_dict(robot_state_data)
+        current_obs_buffer_dict = self.get_current_obs_buffer_dict(robot_state)
         current_obs_dict = self.parse_current_obs_dict(current_obs_buffer_dict)
         return self._update_obs_history(current_obs_dict)
 
@@ -552,9 +554,9 @@ class BasePolicy:
         self.obs_buf_dict = {group: value.copy() for group, value in group_outputs.items()}
         return group_outputs
 
-    def prepare_obs_for_rl(self, robot_state_data):
+    def prepare_obs_for_rl(self, robot_state: RobotState):
         """Prepare observations for RL inference."""
-        group_outputs = self._prepare_group_observations(robot_state_data)
+        group_outputs = self._prepare_group_observations(robot_state)
         if "actor_obs" not in group_outputs:
             raise KeyError("Observation group 'actor_obs' is not configured for this policy.")
         return {"actor_obs": group_outputs["actor_obs"].astype(np.float32, copy=False)}
@@ -563,9 +565,16 @@ class BasePolicy:
     # Control/Command Methods
     # ============================================================================
 
-    def get_init_target(self, robot_state_data):
-        """Get initialization target joint positions."""
-        dof_pos = robot_state_data[:, 7 : 7 + self.num_dofs]
+    def get_init_target(self, robot_state: RobotState):
+        """Get initialization target joint positions.
+
+        Args:
+            robot_state: RobotState object containing current joint positions.
+
+        Returns:
+            Target joint positions as numpy array.
+        """
+        dof_pos = robot_state.joint_positions.reshape(1, -1)
         if self.get_ready_state:
             # Interpolate from current dof_pos to default angles
             q_target = dof_pos + (self.default_dof_angles - dof_pos) * (self.init_count / 500)
@@ -581,22 +590,22 @@ class BasePolicy:
 
         # Stage 1: Read State
         with self.latency_tracker.measure("read_state"):
-            robot_state_data = self.interface.get_low_state()
+            robot_state = self.interface.get_low_state()
 
         # Stage 2: Pre-processing
         with self.latency_tracker.measure("preprocessing"):
             # Determine target joint positions
             if self.get_ready_state:
-                q_target = self.get_init_target(robot_state_data)
+                q_target = self.get_init_target(robot_state)
                 self.init_count = min(self.init_count, 500)
             elif not self.use_policy_action:
-                manual_cmd = self._get_manual_command(robot_state_data)
+                manual_cmd = self._get_manual_command(robot_state)
                 if manual_cmd is not None:
                     q_target = manual_cmd["q"]
                     kp_override = manual_cmd.get("kp")
                     kd_override = manual_cmd.get("kd")
                 else:
-                    q_target = robot_state_data[:, 7 : 7 + self.num_dofs]
+                    q_target = robot_state.joint_positions.reshape(1, -1)
             else:
                 # Prepare for inference - any preprocessing before RL inference
                 pass
@@ -604,7 +613,7 @@ class BasePolicy:
         # Stage 3: Inference
         if self.use_policy_action and not self.get_ready_state:
             with self.latency_tracker.measure("inference"):
-                scaled_policy_action = self.rl_inference(robot_state_data)
+                scaled_policy_action = self.rl_inference(robot_state)
 
         # Stage 4: Post-processing
         with self.latency_tracker.measure("postprocessing"):
@@ -627,13 +636,20 @@ class BasePolicy:
                 self.cmd_q,
                 self.cmd_dq,
                 self.cmd_tau,
-                robot_state_data[0, 7 : 7 + self.num_dofs],
+                robot_state.joint_positions,
                 kp_override=kp_override,
                 kd_override=kd_override,
             )
 
-    def _get_manual_command(self, robot_state_data):
-        """Optional manual command when policy control is disabled."""
+    def _get_manual_command(self, robot_state: RobotState):
+        """Optional manual command when policy control is disabled.
+
+        Args:
+            robot_state: RobotState object containing current robot state.
+
+        Returns:
+            Optional dictionary with 'q', 'kp', 'kd' keys for manual control.
+        """
         return
 
     def _get_obs_phase_time(self):

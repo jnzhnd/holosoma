@@ -1,9 +1,12 @@
 """Unitree robot interface using C++/pybind11 binding."""
 
+from __future__ import annotations
+
 import numpy as np
 
 from holosoma_inference.config.config_types import RobotConfig
 from holosoma_inference.sdk.base.base_interface import BaseInterface
+from holosoma_inference.sdk.base.robot_state import RobotState
 
 
 class UnitreeInterface(BaseInterface):
@@ -42,14 +45,10 @@ class UnitreeInterface(BaseInterface):
         if self.robot_config.robot.lower() == "go2":
             self._unitree_motor_order = (3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8)
 
-    def get_low_state(self) -> np.ndarray:
-        """Get robot state as numpy array."""
+    def get_low_state(self) -> RobotState:
+        """Get robot state as RobotState object."""
         state = self.unitree_interface.read_low_state()
-        base_pos = np.zeros(3)
-        quat = np.array(state.imu.quat)
         motor_pos = np.array(state.motor.q)
-        base_lin_vel = np.zeros(3)
-        base_ang_vel = np.array(state.imu.omega)
         motor_vel = np.array(state.motor.dq)
 
         joint_pos = np.zeros(self.robot_config.num_joints)
@@ -61,7 +60,14 @@ class UnitreeInterface(BaseInterface):
             joint_pos[j_id] = float(motor_pos[m_id])
             joint_vel[j_id] = float(motor_vel[m_id])
 
-        return np.concatenate([base_pos, quat, joint_pos, base_lin_vel, base_ang_vel, joint_vel]).reshape(1, -1)
+        return RobotState(
+            base_position=np.zeros(3),
+            base_orientation=np.array(state.imu.quat),  # wxyz
+            joint_positions=joint_pos,
+            base_linear_velocity=np.zeros(3),
+            base_angular_velocity=np.array(state.imu.omega),
+            joint_velocities=joint_vel,
+        )
 
     def send_low_command(
         self,

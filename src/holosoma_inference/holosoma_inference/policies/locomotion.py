@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import numpy as np
 from termcolor import colored
+
+from holosoma_inference.sdk.base.robot_state import RobotState
 
 from .base import BasePolicy
 
@@ -9,8 +13,8 @@ class LocomotionPolicy(BasePolicy):
         super().__init__(config)
         self.is_standing = False
 
-    def get_current_obs_buffer_dict(self, robot_state_data):
-        current_obs_buffer_dict = super().get_current_obs_buffer_dict(robot_state_data)
+    def get_current_obs_buffer_dict(self, robot_state: RobotState):
+        current_obs_buffer_dict = super().get_current_obs_buffer_dict(robot_state)
         current_obs_buffer_dict["actions"] = self.last_policy_action
         current_obs_buffer_dict["command_lin_vel"] = self.lin_vel_command
         current_obs_buffer_dict["command_ang_vel"] = self.ang_vel_command

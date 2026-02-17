@@ -1,10 +1,13 @@
 """Booster robot interface using sdk2py."""
 
+from __future__ import annotations
+
 import numpy as np
 from termcolor import colored
 
 from holosoma_inference.config.config_types import RobotConfig
 from holosoma_inference.sdk.base.base_interface import BaseInterface
+from holosoma_inference.sdk.base.robot_state import RobotState
 
 
 class BoosterInterface(BaseInterface):
@@ -46,9 +49,36 @@ class BoosterInterface(BaseInterface):
         self.command_sender.config = robot_config
         self.state_processor.config = robot_config
 
-    def get_low_state(self) -> np.ndarray:
-        """Get robot state as numpy array."""
-        return self.state_processor.get_robot_state_data()
+    def get_low_state(self) -> RobotState:
+        """Get robot state as RobotState object."""
+        raw_data = self.state_processor.get_robot_state_data()
+        num_dof = self.robot_config.num_joints
+
+        # Parse the raw state array:
+        # q: [base_pos(3), base_quat(4), joint_pos(N)]
+        # dq: [base_lin_vel(3), base_ang_vel(3), joint_vel(N)]
+        # tau_est: [base_lin_force(3), base_ang_torque(3), joint_torque(N)]
+        # ddq: [base_lin_acc(3), base_ang_acc(3), joint_acc(N)]
+        q_len = 3 + 4 + num_dof
+        dq_len = 3 + 3 + num_dof
+
+        q = raw_data[0, :q_len]
+        dq = raw_data[0, q_len : q_len + dq_len]
+        tau_est = raw_data[0, q_len + dq_len : q_len + 2 * dq_len]
+        ddq = raw_data[0, q_len + 2 * dq_len : q_len + 3 * dq_len]
+
+        return RobotState(
+            base_position=q[:3],
+            base_orientation=q[3:7],  # wxyz
+            joint_positions=q[7:],
+            base_linear_velocity=dq[:3],
+            base_angular_velocity=dq[3:6],
+            joint_velocities=dq[6:],
+            joint_torques=tau_est[6:],
+            base_linear_acceleration=ddq[:3],
+            base_angular_acceleration=ddq[3:6],
+            joint_accelerations=ddq[6:],
+        )
 
     def send_low_command(
         self,

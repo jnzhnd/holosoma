@@ -12,6 +12,7 @@ from termcolor import colored
 from holosoma_inference.config.config_types.inference import InferenceConfig
 from holosoma_inference.policies import BasePolicy
 from holosoma_inference.policies.wbt_utils import MotionClockUtil, PinocchioRobot, TimestepUtil
+from holosoma_inference.sdk.base.robot_state import RobotState
 from holosoma_inference.utils.clock import ClockSub
 from holosoma_inference.utils.math.quat import (
     matrix_from_quat,
@@ -97,21 +98,20 @@ class WholeBodyTrackingPolicy(BasePolicy):
         else:
             _show_warning()
 
-    def _get_ref_body_orientation_in_world(self, robot_state_data):
+    def _get_ref_body_orientation_in_world(self, robot_state: RobotState):
         # Create configuration for pinocchio robot
         # Note:
-        # 1. pinocchio quaternion is in xyzw format, robot_state_data is in wxyz format
+        # 1. pinocchio quaternion is in xyzw format, RobotState orientation is in wxyz format
         # 2. joint sequences in pinocchio robot and real robot are different
 
         # free base pos, does not matter
-        root_pos = robot_state_data[0, :3]
+        root_pos = robot_state.base_position
 
         # free base ori, wxyz -> xyzw
-        root_ori_xyzw = wxyz_to_xyzw(robot_state_data[:, 3:7])[0]
+        root_ori_xyzw = wxyz_to_xyzw(robot_state.base_orientation.reshape(1, -1))[0]
 
         # dof pos in real robot -> pinocchio robot
-        num_dofs = self.num_dofs
-        dof_pos_in_real = robot_state_data[0, 7 : 7 + num_dofs]
+        dof_pos_in_real = robot_state.joint_positions
         dof_pos_in_pinocchio = dof_pos_in_real[self.pinocchio_robot.real2pinocchio_index]
 
         configuration = np.concatenate([root_pos, root_ori_xyzw, dof_pos_in_pinocchio], axis=0)
@@ -198,9 +198,9 @@ class WholeBodyTrackingPolicy(BasePolicy):
         self._stiff_hold_active = True
         self.robot_yaw_offset = 0.0
 
-    def get_init_target(self, robot_state_data):
+    def get_init_target(self, robot_state: RobotState):
         """Get initialization target joint positions."""
-        dof_pos = robot_state_data[:, 7 : 7 + self.num_dofs]
+        dof_pos = robot_state.joint_positions.reshape(1, -1)
         if self.get_ready_state:
             # Interpolate from current dof_pos to first pose in motion command
             target_dof_pos = self.motion_command_0[:, : self.num_dofs]
@@ -210,7 +210,7 @@ class WholeBodyTrackingPolicy(BasePolicy):
             return q_target
         return dof_pos
 
-    def get_current_obs_buffer_dict(self, robot_state_data):
+    def get_current_obs_buffer_dict(self, robot_state: RobotState):
         current_obs_buffer_dict = {}
 
         # motion_command
@@ -221,36 +221,34 @@ class WholeBodyTrackingPolicy(BasePolicy):
         motion_ref_ori = self._remove_yaw_offset(motion_ref_ori, self.motion_yaw_offset)
 
         # robot_ref_ori
-        robot_ref_ori = self._get_ref_body_orientation_in_world(robot_state_data)  #  wxyz
+        robot_ref_ori = self._get_ref_body_orientation_in_world(robot_state)  #  wxyz
         robot_ref_ori = self._remove_yaw_offset(robot_ref_ori, self.robot_yaw_offset)
 
         motion_ref_ori_b = matrix_from_quat(subtract_frame_transforms(robot_ref_ori, motion_ref_ori))
         current_obs_buffer_dict["motion_ref_ori_b"] = motion_ref_ori_b[..., :2].reshape(1, -1)
 
         # base_ang_vel
-        current_obs_buffer_dict["base_ang_vel"] = robot_state_data[:, 7 + self.num_dofs + 3 : 7 + self.num_dofs + 6]
+        current_obs_buffer_dict["base_ang_vel"] = robot_state.base_angular_velocity.reshape(1, -1)
 
         # dof_pos
-        current_obs_buffer_dict["dof_pos"] = robot_state_data[:, 7 : 7 + self.num_dofs] - self.default_dof_angles
+        current_obs_buffer_dict["dof_pos"] = robot_state.joint_positions.reshape(1, -1) - self.default_dof_angles
 
         # dof_vel
-        current_obs_buffer_dict["dof_vel"] = robot_state_data[
-            :, 7 + self.num_dofs + 6 : 7 + self.num_dofs + 6 + self.num_dofs
-        ]
+        current_obs_buffer_dict["dof_vel"] = robot_state.joint_velocities.reshape(1, -1)
 
         # actions
         current_obs_buffer_dict["actions"] = self.last_policy_action
 
         return current_obs_buffer_dict
 
-    def rl_inference(self, robot_state_data):
+    def rl_inference(self, robot_state: RobotState):
         # prepare obs, run policy inference
         if not self.motion_clip_progressing:
             # Keep motion index pinned at the configured start while waiting to trigger the clip.
             self.timestep_util.reset(start_timestep=self.config.task.motion_start_timestep)
             self.curr_motion_timestep = self.timestep_util.timestep
 
-        obs = self.prepare_obs_for_rl(robot_state_data)
+        obs = self.prepare_obs_for_rl(robot_state)
         if self.config.task.print_observations:
             self._print_observations(obs)
 
@@ -268,7 +266,7 @@ class WholeBodyTrackingPolicy(BasePolicy):
 
         return self.scaled_policy_action
 
-    def _get_manual_command(self, robot_state_data):
+    def _get_manual_command(self, robot_state: RobotState):
         # TODO: instead of adding kp/kd_override in def _set_motor_command,
         # just use the motor_kp/motor_kd when calling it in _fill_motor_commands
         if not self._stiff_hold_active:
@@ -351,13 +349,13 @@ class WholeBodyTrackingPolicy(BasePolicy):
 
     def _capture_robot_yaw_offset(self):
         """Capture robot yaw when policy starts to use as reference offset."""
-        robot_state_data = self.interface.get_low_state()
-        if robot_state_data is None:
+        robot_state = self.interface.get_low_state()
+        if robot_state is None:
             self.robot_yaw_offset = 0.0
             self.logger.warning("Unable to capture robot yaw offset - missing robot state.")
             return
 
-        robot_ref_ori = self._get_ref_body_orientation_in_world(robot_state_data)  # wxyz
+        robot_ref_ori = self._get_ref_body_orientation_in_world(robot_state)  # wxyz
         yaw = self._quat_yaw(robot_ref_ori)
         self.robot_yaw_offset = yaw
         self.logger.info(colored(f"Robot yaw offset captured at {np.degrees(yaw):.1f} deg", "blue"))

@@ -1,10 +1,13 @@
 """Base interface for robot control."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 
 import numpy as np
 
 from holosoma_inference.config.config_types import RobotConfig
+from holosoma_inference.sdk.base.robot_state import RobotState
 
 
 class BaseInterface(ABC):
@@ -23,13 +26,13 @@ class BaseInterface(ABC):
         self._wc_key_map = self._default_wc_key_map()
 
     @abstractmethod
-    def get_low_state(self) -> np.ndarray:
+    def get_low_state(self) -> RobotState:
         """
-        Get robot state as numpy array.
+        Get robot state as a structured RobotState object.
 
         Returns:
-            np.ndarray with shape (1, 3+4+N+3+3+N) containing:
-            [base_pos(3), quat(4), joint_pos(N), lin_vel(3), ang_vel(3), joint_vel(N)]
+            RobotState containing base position, orientation, joint positions,
+            velocities, and optional fields like projected_gravity.
         """
         raise NotImplementedError
 
