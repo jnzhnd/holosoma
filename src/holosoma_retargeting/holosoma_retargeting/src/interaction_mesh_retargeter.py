@@ -207,6 +207,8 @@ class InteractionMeshRetargeter:
         self._self_collision_windows: list[tuple[int, int]] | None = sc.windows
         self._self_collision_geom_pairs: list[tuple[int, int]] = []
 
+        self._sc_last_vis_frame = -1
+
         if not self._self_collision_enabled:
             return
 
@@ -782,7 +784,13 @@ class InteractionMeshRetargeter:
         Js, phis = {}, {}
         fromto = np.zeros(6, dtype=float)
 
-        _first_iter = not hasattr(self, '_sc_last_vis_frame') or self._sc_last_vis_frame != frame_idx
+        if not hasattr(self, '_geom_names'):
+            raise RuntimeError(
+                "[SelfCollision] _geom_names not initialized. "
+                "Please run _prefilter_pairs_with_mj_collision first."
+            )
+
+        _first_iter = self._sc_last_vis_frame != frame_idx
         if _first_iter:
             self._sc_last_vis_frame = frame_idx
 
