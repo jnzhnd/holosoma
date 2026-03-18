@@ -235,8 +235,10 @@ class InteractionMeshRetargeter:
                 for gb in geoms_b:
                     self._self_collision_geom_pairs.append((ga, gb))
 
-        print(f"[SelfCollision] Initialized with {len(self._self_collision_geom_pairs)} geom pairs "
-              f"from {len(sc.pairs)} body pairs, tolerance={sc.tolerance}m")
+        print(
+            f"[SelfCollision] Initialized with {len(self._self_collision_geom_pairs)} geom pairs "
+            f"from {len(sc.pairs)} body pairs, tolerance={sc.tolerance}m"
+        )
 
     def _setup_visualization(self):
         """Setup Viser visualization components."""
@@ -784,10 +786,9 @@ class InteractionMeshRetargeter:
         Js, phis = {}, {}
         fromto = np.zeros(6, dtype=float)
 
-        if not hasattr(self, '_geom_names'):
+        if not hasattr(self, "_geom_names"):
             raise RuntimeError(
-                "[SelfCollision] _geom_names not initialized. "
-                "Please run _prefilter_pairs_with_mj_collision first."
+                "[SelfCollision] _geom_names not initialized. Please run _prefilter_pairs_with_mj_collision first."
             )
 
         _first_iter = self._sc_last_vis_frame != frame_idx
@@ -799,9 +800,12 @@ class InteractionMeshRetargeter:
             dist = mujoco.mj_geomDistance(m, d, geom_a, geom_b, threshold, fromto)
             if dist <= threshold:
                 J_rel = self._compute_jacobian_for_contact_relative(
-                    m.geom(geom_a), m.geom(geom_b),
-                    self._geom_names[geom_a], self._geom_names[geom_b],
-                    fromto, dist,
+                    m.geom(geom_a),
+                    m.geom(geom_b),
+                    self._geom_names[geom_a],
+                    self._geom_names[geom_b],
+                    fromto,
+                    dist,
                 )
                 key = ("self", geom_a, geom_b)
                 Js[key] = J_rel
