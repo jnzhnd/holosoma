@@ -18,7 +18,6 @@ from typing import Any
 
 import numpy as np
 from loguru import logger
-
 from torch.nn import Module
 
 from holosoma.agents.callbacks.base_callback import RLEvalCallback
@@ -72,10 +71,7 @@ class EvalRecordingCallback(RLEvalCallback):
         channel_summary = ", ".join(
             f"{name}{list(arr.shape)}" for name, arr in arrays.items() if name != "_metadata_json"
         )
-        logger.info(
-            f"EvalRecordingCallback: saved {self._step_count} steps to {path}\n"
-            f"  Channels: {channel_summary}"
-        )
+        logger.info(f"EvalRecordingCallback: saved {self._step_count} steps to {path}\n  Channels: {channel_summary}")
 
     def on_pre_evaluate_policy(self) -> None:
         env = self._get_env()
@@ -90,9 +86,14 @@ class EvalRecordingCallback(RLEvalCallback):
             self._metadata["body_names"] = list(sim.body_names)
 
         channel_names = [
-            "dof_pos", "dof_vel", "torques", "actions",
-            "root_pos", "root_quat_xyzw",
-            "body_pos_w", "body_quat_xyzw",
+            "dof_pos",
+            "dof_vel",
+            "torques",
+            "actions",
+            "root_pos",
+            "root_quat_xyzw",
+            "body_pos_w",
+            "body_quat_xyzw",
             "commanded_velocity",
         ]
         for name in channel_names:

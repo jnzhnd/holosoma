@@ -21,9 +21,9 @@ from holosoma.agents.fast_sac.fast_sac_utils import (
 from holosoma.agents.modules.augmentation_utils import SymmetryUtils
 from holosoma.agents.modules.logging_utils import LoggingHelper
 from holosoma.config_types.algo import FastSACConfig
-from holosoma.utils.helpers import instantiate
 from holosoma.envs.base_task.base_task import BaseTask
 from holosoma.utils.average_meters import TensorAverageMeterDict
+from holosoma.utils.helpers import instantiate
 from holosoma.utils.inference_helpers import (
     attach_onnx_metadata,
     export_motion_and_policy_as_onnx,
@@ -1027,9 +1027,7 @@ class FastSACAgent(BaseAlgo):
     def _create_eval_callbacks(self):
         if self.config.eval_callbacks is not None:
             for cb_name in self.config.eval_callbacks:
-                self.eval_callbacks.append(
-                    instantiate(self.config.eval_callbacks[cb_name], training_loop=self)
-                )
+                self.eval_callbacks.append(instantiate(self.config.eval_callbacks[cb_name], training_loop=self))
 
     def _pre_evaluate_policy(self):
         self.env.set_is_evaluating()
