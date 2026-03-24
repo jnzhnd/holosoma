@@ -6,14 +6,12 @@ for later visualization with viser_eval_viewer.py.
 
 from __future__ import annotations
 
-import atexit
 import json
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 from loguru import logger
-from torch.nn import Module
 
 from holosoma.agents.callbacks.base_callback import RLEvalCallback
 from holosoma.config_types.eval_callback import RecordingConfig
@@ -21,18 +19,14 @@ from holosoma.utils.safe_torch_import import torch
 
 
 class EvalRecordingCallback(RLEvalCallback):
-    """Records per-step data during evaluation and saves to .npz on completion or interruption."""
+    """Records per-step data during evaluation and saves to .npz on completion."""
 
     def __init__(
         self,
         config: RecordingConfig,
         training_loop: Any = None,
     ):
-        # Skip RLEvalCallback.__init__ which accesses training_loop.device;
-        # training_loop may be set later by _create_eval_callbacks.
-        Module.__init__(self)
-        self.training_loop = training_loop
-        self.device = None
+        super().__init__(config, training_loop)
         self.env_id = config.env_id
 
         output_path = config.output_path
@@ -45,17 +39,15 @@ class EvalRecordingCallback(RLEvalCallback):
         self._buffers: dict[str, list[np.ndarray]] = {}
         self._metadata: dict[str, Any] = {}
         self._step_count = 0
-        self._saved = False
 
     def _get_env(self):
         """Get the unwrapped BaseTask environment."""
         return self.training_loop._unwrap_env()
 
     def _save(self) -> None:
-        """Save recorded data to NPZ. Safe to call multiple times."""
-        if self._saved or self._step_count == 0:
+        """Save recorded data to NPZ."""
+        if self._step_count == 0:
             return
-        self._saved = True
 
         arrays: dict[str, np.ndarray] = {}
         for name, values in self._buffers.items():
@@ -113,8 +105,6 @@ class EvalRecordingCallback(RLEvalCallback):
         ]
         for name in channel_names:
             self._buffers[name] = []
-
-        atexit.register(self._save)
 
         logger.info(f"EvalRecordingCallback: recording env_id={self.env_id}, output={self.output_path}")
 
