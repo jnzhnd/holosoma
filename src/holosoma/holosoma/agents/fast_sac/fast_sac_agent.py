@@ -1021,11 +1021,12 @@ class FastSACAgent(BaseAlgo):
                 normalized_obs = obs
             # Actions are already scaled by the actor
             actions = self.actor(normalized_obs)[0]
-            obs, _, _, _ = self.env.step(actions)
 
-            # Pass actor_state to callbacks — e.g. EvalRecordingCallback reads
-            # actions from here (not available from the simulator directly).
             actor_state = {"step": step, "actions": actions, "obs": obs}
+            actor_state = self._pre_eval_env_step(actor_state)
+
+            obs, _, _, _ = self.env.step(actor_state["actions"])
+            actor_state["obs"] = obs
             actor_state = self._post_eval_env_step(actor_state)
 
         self._post_evaluate_policy()
@@ -1043,6 +1044,11 @@ class FastSACAgent(BaseAlgo):
     def _post_evaluate_policy(self):
         for c in self.eval_callbacks:
             c.on_post_evaluate_policy()
+
+    def _pre_eval_env_step(self, actor_state: dict) -> dict:
+        for c in self.eval_callbacks:
+            actor_state = c.on_pre_eval_env_step(actor_state)
+        return actor_state
 
     def _post_eval_env_step(self, actor_state: dict) -> dict:
         for c in self.eval_callbacks:

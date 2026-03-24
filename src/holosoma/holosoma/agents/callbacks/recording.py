@@ -2,17 +2,12 @@
 
 Records joint positions, velocities, torques, body poses, and root state
 for later visualization with viser_eval_viewer.py.
-
-Since eval_agent doesn't exit on its own (must be killed with timeout),
-this callback registers an atexit/signal handler to save data even on
-interruption.
 """
 
 from __future__ import annotations
 
 import atexit
 import json
-import signal
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +16,7 @@ from loguru import logger
 from torch.nn import Module
 
 from holosoma.agents.callbacks.base_callback import RLEvalCallback
-from holosoma.config_types.eval_callback import RecordingCallbackConfig
+from holosoma.config_types.eval_callback import RecordingConfig
 from holosoma.utils.safe_torch_import import torch
 
 
@@ -30,9 +25,8 @@ class EvalRecordingCallback(RLEvalCallback):
 
     def __init__(
         self,
-        config: RecordingCallbackConfig,
+        config: RecordingConfig,
         training_loop: Any = None,
-        output_path_override: str | None = None,
     ):
         # Skip RLEvalCallback.__init__ which accesses training_loop.device;
         # training_loop may be set later by _create_eval_callbacks.
@@ -40,7 +34,13 @@ class EvalRecordingCallback(RLEvalCallback):
         self.training_loop = training_loop
         self.device = None
         self.env_id = config.env_id
-        self.output_path = output_path_override or config.output_path or "eval_recording.npz"
+
+        output_path = config.output_path
+        if not output_path.endswith(".npz"):
+            output_path += ".npz"
+        if training_loop is not None and hasattr(training_loop, "log_dir"):
+            output_path = str(Path(training_loop.log_dir) / output_path)
+        self.output_path = output_path
 
         self._buffers: dict[str, list[np.ndarray]] = {}
         self._metadata: dict[str, Any] = {}
@@ -79,19 +79,34 @@ class EvalRecordingCallback(RLEvalCallback):
 
         self._metadata["dt"] = float(env.dt)
         self._metadata["fps"] = round(1.0 / float(env.dt))
+        self._metadata["sim_dt"] = float(env.sim_dt)
+        self._metadata["sim_fps"] = round(1.0 / float(env.sim_dt))
+        self._metadata["control_decimation"] = env.simulator.simulator_config.sim.control_decimation
         self._metadata["env_id"] = self.env_id
         if hasattr(sim, "dof_names"):
             self._metadata["dof_names"] = list(sim.dof_names)
         if hasattr(sim, "body_names"):
             self._metadata["body_names"] = list(sim.body_names)
 
+        # Static robot properties
+        robot_cfg = env.robot_config
+        self._metadata["effort_limits"] = list(robot_cfg.dof_effort_limit_list)
+        self._metadata["dof_pos_lower_limits"] = list(robot_cfg.dof_pos_lower_limit_list)
+        self._metadata["dof_pos_upper_limits"] = list(robot_cfg.dof_pos_upper_limit_list)
+        self._metadata["velocity_limits"] = list(robot_cfg.dof_vel_limit_list)
+        asset_cfg = robot_cfg.asset
+        self._metadata["urdf_path"] = str(Path(asset_cfg.asset_root) / asset_cfg.urdf_file)
+
         channel_names = [
             "dof_pos",
             "dof_vel",
             "torques",
+            "torques_history",
             "actions",
             "root_pos",
             "root_quat_xyzw",
+            "root_lin_vel",
+            "root_ang_vel",
             "body_pos_w",
             "body_quat_xyzw",
             "commanded_velocity",
@@ -99,15 +114,7 @@ class EvalRecordingCallback(RLEvalCallback):
         for name in channel_names:
             self._buffers[name] = []
 
-        # Register safety nets so data is saved even if killed by timeout
         atexit.register(self._save)
-
-        def _sigterm_handler(signum, frame):
-            logger.info("EvalRecordingCallback: caught SIGTERM, saving recording...")
-            self._save()
-            raise SystemExit(0)
-
-        signal.signal(signal.SIGTERM, _sigterm_handler)
 
         logger.info(f"EvalRecordingCallback: recording env_id={self.env_id}, output={self.output_path}")
 
@@ -126,13 +133,16 @@ class EvalRecordingCallback(RLEvalCallback):
         root = sim.robot_root_states[eid]
         self._buffers["root_pos"].append(_to_np(root[:3]))
         self._buffers["root_quat_xyzw"].append(_to_np(root[3:7]))
+        self._buffers["root_lin_vel"].append(_to_np(root[7:10]))
+        self._buffers["root_ang_vel"].append(_to_np(root[10:13]))
 
         self._buffers["body_pos_w"].append(_to_np(sim._rigid_body_pos[eid]))
         self._buffers["body_quat_xyzw"].append(_to_np(sim._rigid_body_rot[eid]))
 
-        torques = self._extract_torques(env, eid)
-        if torques is not None:
-            self._buffers["torques"].append(_to_np(torques))
+        # torques_history shape: [decimation, num_dof] — one row per physics sub-step
+        torques_history = self._extract_torques_history(env, eid)
+        self._buffers["torques_history"].append(_to_np(torques_history))
+        self._buffers["torques"].append(_to_np(torques_history[0]))
 
         if "actions" in actor_state and actor_state["actions"] is not None:
             self._buffers["actions"].append(_to_np(actor_state["actions"][eid]))
@@ -147,14 +157,15 @@ class EvalRecordingCallback(RLEvalCallback):
         self._step_count += 1
         return actor_state
 
-    def _extract_torques(self, env: Any, env_id: int) -> torch.Tensor | None:
-        """Extract applied torques from the action manager's joint control term."""
-        if not hasattr(env, "action_manager") or env.action_manager is None:
-            return None
+    def _extract_torques_history(self, env: Any, env_id: int) -> torch.Tensor:
+        """Extract sub-step torque history from the action manager's joint control term.
+
+        Returns shape [decimation, num_dof] for one env.
+        """
         for _term_name, term in env.action_manager.iter_terms():
-            if hasattr(term, "torques"):
-                return term.torques[env_id]
-        return None
+            if hasattr(term, "torques_history"):
+                return term.torques_history[env_id]
+        raise RuntimeError("No action term with torques_history found")
 
     def on_post_evaluate_policy(self) -> None:
         self._save()
