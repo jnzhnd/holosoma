@@ -149,6 +149,7 @@ class EvalPushCallback(RLEvalCallback):
         eid = self.env_id
 
         if self._push_active:
+            assert self._current_force_w is not None
             force_w = self._current_force_w.detach().cpu().numpy().copy()
             body_pos = self._sim._robot.data.body_pos_w[eid, self._current_isaac_body_id].detach().cpu().numpy().copy()
             body_idx = self._current_body_names_idx
