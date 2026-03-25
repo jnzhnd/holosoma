@@ -93,7 +93,9 @@ class EvalRecordingCallback(RLEvalCallback):
             "dof_pos",
             "dof_vel",
             "torques",
-            "torques_history",
+            "torques_substep",
+            "dof_pos_substep",
+            "dof_vel_substep",
             "actions",
             "root_pos",
             "root_quat_xyzw",
@@ -129,10 +131,12 @@ class EvalRecordingCallback(RLEvalCallback):
         self._buffers["body_pos_w"].append(_to_np(sim._rigid_body_pos[eid]))
         self._buffers["body_quat_xyzw"].append(_to_np(sim._rigid_body_rot[eid]))
 
-        # torques_history shape: [decimation, num_dof] — one row per physics sub-step
-        torques_history = self._extract_torques_history(env, eid)
-        self._buffers["torques_history"].append(_to_np(torques_history))
-        self._buffers["torques"].append(_to_np(torques_history[0]))
+        # substep tensors: [decimation, num_dof] — one row per physics sub-step
+        torques_substep, dof_pos_substep, dof_vel_substep = self._extract_substep_data(env, eid)
+        self._buffers["torques_substep"].append(_to_np(torques_substep))
+        self._buffers["dof_pos_substep"].append(_to_np(dof_pos_substep))
+        self._buffers["dof_vel_substep"].append(_to_np(dof_vel_substep))
+        self._buffers["torques"].append(_to_np(torques_substep[0]))
 
         if "actions" in actor_state and actor_state["actions"] is not None:
             self._buffers["actions"].append(_to_np(actor_state["actions"][eid]))
@@ -147,15 +151,17 @@ class EvalRecordingCallback(RLEvalCallback):
         self._step_count += 1
         return actor_state
 
-    def _extract_torques_history(self, env: Any, env_id: int) -> torch.Tensor:
-        """Extract sub-step torque history from the action manager's joint control term.
+    def _extract_substep_data(
+        self, env: Any, env_id: int
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Extract sub-step torques, dof_pos, and dof_vel from the action manager's joint control term.
 
-        Returns shape [decimation, num_dof] for one env.
+        Returns (torques_substep, dof_pos_substep, dof_vel_substep), each shape [decimation, num_dof].
         """
         for _term_name, term in env.action_manager.iter_terms():
-            if hasattr(term, "torques_history"):
-                return term.torques_history[env_id]
-        raise RuntimeError("No action term with torques_history found")
+            if hasattr(term, "torques_substep"):
+                return term.torques_substep[env_id], term.dof_pos_substep[env_id], term.dof_vel_substep[env_id]
+        raise RuntimeError("No action term with torques_substep found")
 
     def on_post_evaluate_policy(self) -> None:
         self._save()
