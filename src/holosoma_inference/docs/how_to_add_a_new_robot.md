@@ -4,9 +4,9 @@ This document is meant to serve as a high-level overview on how to add a new rob
 
 ---
 
-## 1. Subclass `BaseInterface`
+## 1. Implement Interface.
 
-Create `sdk/myrobot/myrobot_interface.py` and implement all abstract methods. Most importantly, `get_low_state()` and  `send_low_command()`:
+Create `MyRobotInterface(BaseInterface)` and implement all abstract methods. Most importantly, `get_low_state()` and  `send_low_command()`:
 
 ```python
 from holosoma_inference.sdk.base.base_interface import BaseInterface
