@@ -97,6 +97,7 @@ class EvalRecordingCallback(RLEvalCallback):
             "dof_pos_substep",
             "dof_vel_substep",
             "actions",
+            "dof_pos_target",
             "root_pos",
             "root_quat_xyzw",
             "root_lin_vel",
@@ -118,8 +119,11 @@ class EvalRecordingCallback(RLEvalCallback):
         def _to_np(t: torch.Tensor) -> np.ndarray:
             return t.detach().cpu().numpy().copy()
 
-        self._buffers["dof_pos"].append(_to_np(sim.dof_pos[eid]))
+        self._buffers["dof_pos"].append(_to_np(sim.dof_pos[eid]))  # post_eval_env_step, so after 4 decimation
         self._buffers["dof_vel"].append(_to_np(sim.dof_vel[eid]))
+        self._buffers["torques"].append(
+            _to_np(self._extract_torques(env, eid))
+        )  # pre_eval_env_step, so the torques is the last decimation
 
         # robot_root_states: [num_envs, 13] = pos(3), quat_xyzw(4), lin_vel(3), ang_vel(3)
         root = sim.robot_root_states[eid]
@@ -136,10 +140,12 @@ class EvalRecordingCallback(RLEvalCallback):
         self._buffers["torques_substep"].append(_to_np(torques_substep))
         self._buffers["dof_pos_substep"].append(_to_np(dof_pos_substep))
         self._buffers["dof_vel_substep"].append(_to_np(dof_vel_substep))
-        self._buffers["torques"].append(_to_np(torques_substep[0]))
 
         if "actions" in actor_state and actor_state["actions"] is not None:
             self._buffers["actions"].append(_to_np(actor_state["actions"][eid]))
+
+        # Record desired target joint positions (PD setpoint)
+        self._buffers["dof_pos_target"].append(_to_np(self._extract_dof_pos_target(env, eid)))
 
         # Record commanded velocity [lin_vel_x, lin_vel_y, ang_vel_yaw]
         if hasattr(env, "command_manager") and env.command_manager is not None:
@@ -151,9 +157,28 @@ class EvalRecordingCallback(RLEvalCallback):
         self._step_count += 1
         return actor_state
 
-    def _extract_substep_data(
-        self, env: Any, env_id: int
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _extract_dof_pos_target(self, env: Any, env_id: int) -> torch.Tensor:
+        """Extract desired target joint positions from the action manager's joint control term.
+
+        The PD target is: actions_after_delay * action_scales + default_dof_pos.
+        Returns shape [num_dof].
+        """
+        for _term_name, term in env.action_manager.iter_terms():
+            if hasattr(term, "_actions_after_delay") and hasattr(term, "action_scales"):
+                return term._actions_after_delay[env_id] * term.action_scales + env.default_dof_pos[env_id]
+        raise RuntimeError("No action term with _actions_after_delay found")
+
+    def _extract_torques(self, env: Any, env_id: int) -> torch.Tensor:
+        """Extract torques from the action manager's joint control term.
+
+        Returns torques, shape [num_dof].
+        """
+        for _term_name, term in env.action_manager.iter_terms():
+            if hasattr(term, "torques"):
+                return term.torques[env_id]
+        raise RuntimeError("No action term with torques found")
+
+    def _extract_substep_data(self, env: Any, env_id: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Extract sub-step torques, dof_pos, and dof_vel from the action manager's joint control term.
 
         Returns (torques_substep, dof_pos_substep, dof_vel_substep), each shape [decimation, num_dof].
