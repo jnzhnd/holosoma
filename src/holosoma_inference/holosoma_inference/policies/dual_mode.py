@@ -118,9 +118,13 @@ class DualModePolicy:
 
         # Carry over joystick key_states so edge detection doesn't see a false
         # rising edge on the X button (which is still physically held down).
-        if hasattr(self.active, "key_states"):
-            target.key_states = self.active.key_states.copy()
-            target.last_key_states = self.active.key_states.copy()
+        from holosoma_inference.inputs.joystick import JoystickVelocityInput
+
+        active_vel = self.active._velocity_input
+        target_vel = target._velocity_input
+        if isinstance(active_vel, JoystickVelocityInput) and isinstance(target_vel, JoystickVelocityInput):
+            target_vel.key_states = active_vel.key_states.copy()
+            target_vel.last_key_states = active_vel.key_states.copy()
 
         self.active = target
         self.active_label = target_label
@@ -143,8 +147,8 @@ class DualModePolicy:
             for it in itertools.count():
                 self.active.latency_tracker.start_cycle()
 
-                if self.active.use_joystick and self.active.interface.get_joystick_msg() is not None:
-                    self.active.process_joystick_input()
+                self.active._velocity_input.poll()
+                self.active._other_input.poll()
                 if self.active.use_phase:
                     self.active.update_phase_time()
 

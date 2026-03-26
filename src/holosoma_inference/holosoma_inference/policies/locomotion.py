@@ -1,6 +1,8 @@
 import numpy as np
 from termcolor import colored
 
+from holosoma_inference.config.config_types.task import InputSource
+
 from .base import BasePolicy
 
 
@@ -45,33 +47,23 @@ class LocomotionPolicy(BasePolicy):
             self.phase = np.array([[0.0, np.pi]])
             self.is_standing = False
 
-    def handle_keyboard_button(self, keycode):
-        """Handle keyboard button presses for locomotion."""
-        # Call parent handler for common commands
-        super().handle_keyboard_button(keycode)
+    def _create_velocity_input(self, source):
+        if source == InputSource.keyboard:
+            from holosoma_inference.inputs.keyboard import LocomotionKeyboardVelocityInput
 
-        # Locomotion-specific commands
-        if keycode in ["w", "s", "a", "d"]:
-            self._handle_velocity_control(keycode)
-        elif keycode in ["q", "e"]:
-            self._handle_angular_velocity_control(keycode)
-        elif keycode == "=":
-            self._handle_stand_command()
-        elif keycode == "z":
-            self._handle_zero_velocity()
+            return LocomotionKeyboardVelocityInput(self)
+        return super()._create_velocity_input(source)
 
-        self._print_control_status()
+    def _create_other_input(self, source):
+        if source == InputSource.keyboard:
+            from holosoma_inference.inputs.keyboard import LocomotionKeyboardOtherInput
 
-    def handle_joystick_button(self, cur_key):
-        """Handle joystick button presses for locomotion."""
-        # Call parent handler for common commands
-        super().handle_joystick_button(cur_key)
+            return LocomotionKeyboardOtherInput(self)
+        if source == InputSource.joystick:
+            from holosoma_inference.inputs.joystick import LocomotionJoystickOtherInput
 
-        # Locomotion-specific commands
-        if cur_key == "start":
-            self._handle_stand_command()
-        elif cur_key == "L2":
-            self._handle_zero_velocity()
+            return LocomotionJoystickOtherInput(self)
+        return super()._create_other_input(source)
 
     def _handle_velocity_control(self, keycode):
         """Handle linear velocity control."""

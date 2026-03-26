@@ -10,6 +10,7 @@ from loguru import logger
 from termcolor import colored
 
 from holosoma_inference.config.config_types.inference import InferenceConfig
+from holosoma_inference.config.config_types.task import InputSource
 from holosoma_inference.policies import BasePolicy
 from holosoma_inference.policies.wbt_utils import MotionClockUtil, PinocchioRobot, TimestepUtil
 from holosoma_inference.utils.clock import ClockSub
@@ -407,22 +408,16 @@ class WholeBodyTrackingPolicy(BasePolicy):
         else:
             self.logger.info(colored("Starting motion clip", "blue"))
 
-    def handle_keyboard_button(self, keycode):
-        """Add new keyboard button to start and end the motion clips"""
-        if keycode == "s":
-            self._handle_start_motion_clip()
-        else:
-            super().handle_keyboard_button(keycode)
+    def _create_other_input(self, source):
+        if source == InputSource.keyboard:
+            from holosoma_inference.inputs.keyboard import WbtKeyboardOtherInput
 
-    def handle_joystick_button(self, cur_key):
-        """Handle joystick button presses for WBT-specific controls."""
-        if cur_key == "start":
-            # Start playing motion clip
-            self._handle_start_motion_clip()
-        else:
-            # Delegate all other buttons to base class
-            super().handle_joystick_button(cur_key)
-        super()._print_control_status()
+            return WbtKeyboardOtherInput(self)
+        if source == InputSource.joystick:
+            from holosoma_inference.inputs.joystick import WbtJoystickOtherInput
+
+            return WbtJoystickOtherInput(self)
+        return super()._create_other_input(source)
 
     def _capture_robot_yaw_offset(self):
         """Capture robot yaw when policy starts to use as reference offset."""

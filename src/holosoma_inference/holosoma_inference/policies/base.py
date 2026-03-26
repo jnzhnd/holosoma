@@ -14,11 +14,11 @@ import numpy as np
 import onnx
 import onnxruntime
 from loguru import logger
-from sshkeyboard import listen_keyboard
 from termcolor import colored
 
 from holosoma_inference.config.config_types.inference import InferenceConfig
 from holosoma_inference.config.config_types.robot import RobotConfig
+from holosoma_inference.config.config_types.task import InputSource
 from holosoma_inference.sdk import create_interface
 from holosoma_inference.utils.latency import LatencyTracker
 from holosoma_inference.utils.math.quat import quat_rotate_inverse
@@ -138,11 +138,15 @@ class BasePolicy:
         if hasattr(self, "_shared_hardware_source"):
             self.interface = self._shared_hardware_source.interface
             return
+        # Derive use_joystick for SDK: True if joystick is used for either channel
+        vel = self.config.task.velocity_input
+        other = self.config.task.other_input
+        need_joystick = InputSource.joystick in (vel, other)
         self.interface = create_interface(
             self.robot_config,
             self.config.task.domain_id,
             self.config.task.interface,
-            self.config.task.use_joystick,
+            need_joystick,
         )
 
     def _init_policy_components(self, model_path, policy_action_scale, rl_rate):
@@ -300,6 +304,8 @@ class BasePolicy:
             self.rate = self._shared_hardware_source.rate
             self.rl_rate = self._shared_hardware_source.rl_rate
             self.use_joystick = self._shared_hardware_source.use_joystick
+            self.use_keyboard = self._shared_hardware_source.use_keyboard
+            self._create_input_providers()
             return
         self._init_rate_handler()
         self._init_input_device()
@@ -321,37 +327,112 @@ class BasePolicy:
             self.rate = RateLimiter(self.rl_rate)
 
     def _init_input_device(self):
-        """Initialize input device (joystick or keyboard)."""
-        if self.config.task.use_joystick:
+        """Initialize input hardware and create input providers.
+
+        Each channel independently selects from InputSource enum values.
+        Hardware is initialized based on the union of both channels' requirements,
+        then providers are created via factory methods (overridden by subclasses).
+        """
+        vel = self.config.task.velocity_input
+        other = self.config.task.other_input
+        sources = {vel, other}
+
+        # Joystick (needed if either channel uses it)
+        if InputSource.joystick in sources:
             self._init_joystick_handler()
         else:
-            self._init_keyboard_handler()
+            self.use_joystick = False
+
+        # use_keyboard is set by KeyboardListener when providers start
+        self.use_keyboard = False
+
+        self._create_input_providers()
 
     def _init_joystick_handler(self):
         """Initialize joystick handler."""
         if sys.platform == "darwin":
             self.logger.warning("Joystick is not supported on Windows or Mac.")
-            self.logger.warning("Using keyboard instead")
+            self.logger.warning("Falling back to keyboard for joystick channel")
             self.use_joystick = False
-            self._init_keyboard_handler()
         else:
             self.logger.info("Using joystick")
             self.use_joystick = True
 
-    def _init_keyboard_handler(self):
-        """Initialize keyboard handler."""
-        self.logger.info("Using keyboard")
-        self.use_joystick = False
-        # Check if running in a TTY environment
-        if not sys.stdin.isatty():
-            self.logger.warning("Not running in a TTY environment - keyboard input disabled")
-            self.logger.warning("This is normal for automated tests or non-interactive environments")
-            self.logger.info("Auto-starting policy in non-interactive mode")
-            self.use_policy_action = True
-            return
-        # Start keyboard listener in a daemon thread
-        threading.Thread(target=self.start_key_listener, daemon=True).start()
-        self.logger.info("Keyboard Listener Initialized")
+    def _create_input_providers(self):
+        """Create and start input providers based on config.
+
+        Called after hardware init. Subclasses override _create_velocity_input
+        and _create_other_input for policy-specific provider variants.
+        """
+        vel = self.config.task.velocity_input
+        other = self.config.task.other_input
+
+        # Fall back to keyboard when joystick is unavailable
+        if not self.use_joystick:
+            if vel == InputSource.joystick:
+                vel = InputSource.keyboard
+            if other == InputSource.joystick:
+                other = InputSource.keyboard
+
+        self._velocity_input = self._create_velocity_input(vel)
+        self._other_input = self._create_other_input(other)
+
+        # Wire shared joystick state when both channels use joystick
+        from holosoma_inference.inputs.joystick import JoystickOtherInput, JoystickVelocityInput
+
+        if isinstance(self._other_input, JoystickOtherInput) and isinstance(self._velocity_input, JoystickVelocityInput):
+            self._other_input._shared_velocity = self._velocity_input
+
+        self._velocity_input.start()
+        self._other_input.start()
+
+    def _create_velocity_input(self, source: InputSource):
+        """Create velocity input provider. Override for policy-specific variants."""
+        if source == InputSource.keyboard:
+            from holosoma_inference.inputs.keyboard import KeyboardVelocityInput
+
+            return KeyboardVelocityInput(self)
+        if source == InputSource.joystick:
+            from holosoma_inference.inputs.joystick import JoystickVelocityInput
+
+            return JoystickVelocityInput(self)
+        if source == InputSource.ros2:
+            from holosoma_inference.inputs.ros2 import Ros2VelocityInput
+
+            return Ros2VelocityInput(self)
+        raise ValueError(f"Unknown velocity input source: {source}")
+
+    def _create_other_input(self, source: InputSource):
+        """Create other input provider. Override for policy-specific variants."""
+        if source == InputSource.keyboard:
+            from holosoma_inference.inputs.keyboard import KeyboardOtherInput
+
+            return KeyboardOtherInput(self)
+        if source == InputSource.joystick:
+            from holosoma_inference.inputs.joystick import JoystickOtherInput
+
+            return JoystickOtherInput(self)
+        if source == InputSource.ros2:
+            from holosoma_inference.inputs.ros2 import Ros2OtherInput
+
+            return Ros2OtherInput(self)
+        raise ValueError(f"Unknown other input source: {source}")
+
+    def _init_ros_node(self):
+        """Ensure rclpy is initialized and we have a ROS2 node."""
+        if hasattr(self, "node") and self.node is not None:
+            return  # Already initialized (e.g. by use_ros rate handler)
+        import rclpy
+
+        try:
+            rclpy.init(args=None)
+        except RuntimeError:
+            pass  # Already initialized
+        self.node = rclpy.create_node("policy_node")
+        self.logger = self.node.get_logger()
+        self.rate = self.node.create_rate(self.rl_rate)
+        thread = threading.Thread(target=rclpy.spin, args=(self.node,), daemon=True)
+        thread.start()
 
     # ============================================================================
     # Policy Methods
@@ -699,81 +780,19 @@ class BasePolicy:
         self.phase = np.fmod(phase_tp1 + np.pi, 2 * np.pi) - np.pi
 
     # ============================================================================
-    # Input Handler Methods
-    # ============================================================================
-
-    def start_key_listener(self):
-        """Start keyboard listener thread."""
-
-        def on_press(keycode):
-            try:
-                self.handle_keyboard_button(keycode)
-            except AttributeError:
-                pass  # Handle special keys if needed
-
-        try:
-            listener = listen_keyboard(on_press=on_press)
-            listener.start()
-            listener.join()
-        except OSError as e:
-            # Handle termios errors in non-TTY environments
-            self.logger.warning("Could not start keyboard listener: %s", e)
-            self.logger.warning("Keyboard input will not be available")
-
-    def process_joystick_input(self):
-        """Process joystick input and update commands using interface."""
-        # Store previous key states for edge detection
-        self.last_key_states = self.key_states.copy() if hasattr(self, "key_states") else {}
-
-        # Process joystick input - returns (lin_vel, ang_vel, key_states)
-        self.lin_vel_command, self.ang_vel_command, self.key_states = self.interface.process_joystick_input(
-            self.lin_vel_command, self.ang_vel_command, self.stand_command, False
-        )
-
-        # Handle button presses (edge detection: only trigger on press, not hold)
-        for key, is_pressed in self.key_states.items():
-            if is_pressed and not self.last_key_states.get(key, False):
-                self.handle_joystick_button(key)
-                self._print_control_status()
-
-    # ============================================================================
-    # Button Handler Methods
+    # Button Handler Methods (dispatch to providers)
     # ============================================================================
 
     def handle_keyboard_button(self, keycode):
-        """Handle keyboard button presses."""
-        if self._try_switch_policy_key(keycode):
-            pass
-        elif keycode == "]":
-            self._handle_start_policy()
-        elif keycode == "o":
-            self._handle_stop_policy()
-        elif keycode == "i":
-            self._handle_init_state()
-        elif keycode in ["v", "b", "f", "g", "r"]:
-            self._handle_kp_control(keycode)
-
+        """Dispatch keyboard input to velocity and other input providers."""
+        if not self._velocity_input.handle_key(keycode):
+            self._other_input.handle_key(keycode)
         self._print_control_status()
 
     def handle_joystick_button(self, cur_key):
-        """Handle joystick button presses."""
-        if cur_key == "A":
-            self._handle_start_policy()
-        elif cur_key == "B":
-            self._handle_stop_policy()
-        elif cur_key == "Y":
-            self._handle_init_state()
-        elif cur_key in ["up", "down", "left", "right", "F1"]:
-            # TODO: Make this more intuitive
-            self._handle_joystick_kp_control(cur_key)
-        elif cur_key == "select":
-            # Cycle to next policy
-            next_index = (self.active_policy_index + 1) % len(self.model_paths)
-            self._activate_policy(next_index)
-        elif cur_key == "L1+R1":
-            # Kill program, works on G1 joystick only.
-            self.logger.info(colored("Killing program via joystick command", "red"))
-            sys.exit(0)
+        """Dispatch joystick button to other input provider."""
+        self._other_input.handle_joystick_button(cur_key)
+        self._print_control_status()
 
     # ============================================================================
     # Control Action Methods
@@ -851,8 +870,8 @@ class BasePolicy:
             for it in itertools.count():
                 self.latency_tracker.start_cycle()
 
-                if self.use_joystick and self.interface.get_joystick_msg() is not None:
-                    self.process_joystick_input()
+                self._velocity_input.poll()
+                self._other_input.poll()
                 if self.use_phase:
                     self.update_phase_time()
 
