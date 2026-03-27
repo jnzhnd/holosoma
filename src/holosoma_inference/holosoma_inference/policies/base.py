@@ -399,15 +399,13 @@ class BasePolicy:
         class attributes — subclasses just override those instead of this method.
         """
         if source == InputSource.keyboard:
-            from holosoma_inference.inputs.api.commands import KEYBOARD_BASE
-            from holosoma_inference.inputs.impl.keyboard import KeyboardOtherInput, _ensure_keyboard_listener
+            from holosoma_inference.inputs.impl.keyboard import KEYBOARD_BASE, KeyboardOtherInput, _ensure_keyboard_listener
 
             _ensure_keyboard_listener(self)
             mapping = self._keyboard_command_mapping or KEYBOARD_BASE
             return KeyboardOtherInput(mapping, self._get_keyboard_queue())
         if source == InputSource.joystick:
-            from holosoma_inference.inputs.api.commands import JOYSTICK_BASE
-            from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
+            from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE, JoystickOtherInput
 
             return JoystickOtherInput(self, self._joystick_command_mapping or JOYSTICK_BASE)
         if source == InputSource.ros2:

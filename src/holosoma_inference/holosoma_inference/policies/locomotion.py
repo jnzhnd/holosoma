@@ -1,7 +1,8 @@
 import numpy as np
 from termcolor import colored
 
-from holosoma_inference.inputs.api.commands import JOYSTICK_LOCOMOTION, KEYBOARD_LOCOMOTION
+from holosoma_inference.inputs.impl.joystick import JOYSTICK_LOCOMOTION
+from holosoma_inference.inputs.impl.keyboard import KEYBOARD_LOCOMOTION
 
 from .base import BasePolicy
 

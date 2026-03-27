@@ -6,9 +6,38 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from holosoma_inference.inputs.api.base import OtherInput, VelocityInput
+from holosoma_inference.inputs.api.commands import Command, LocomotionCommand, WbtCommand
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
+
+# ---------------------------------------------------------------------------
+# Joystick mappings
+# ---------------------------------------------------------------------------
+
+JOYSTICK_BASE: dict[str, Enum] = {
+    "A": Command.START,
+    "B": Command.STOP,
+    "Y": Command.INIT,
+    "up": Command.KP_UP,
+    "down": Command.KP_DOWN,
+    "left": Command.KP_DOWN_FINE,
+    "right": Command.KP_UP_FINE,
+    "F1": Command.KP_RESET,
+    "select": Command.NEXT_POLICY,
+    "L1+R1": Command.KILL,
+}
+
+JOYSTICK_LOCOMOTION: dict[str, Enum] = {
+    **JOYSTICK_BASE,
+    "start": LocomotionCommand.STAND_TOGGLE,
+    "L2": LocomotionCommand.ZERO_VELOCITY,
+}
+
+JOYSTICK_WBT: dict[str, Enum] = {
+    **JOYSTICK_BASE,
+    "start": WbtCommand.START_MOTION_CLIP,
+}
 
 
 class JoystickVelocityInput(VelocityInput):

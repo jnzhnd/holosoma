@@ -7,10 +7,22 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from holosoma_inference.inputs.api.base import OtherInput, VelocityInput
-from holosoma_inference.inputs.api.commands import ROS2_COMMAND_MAP
+from holosoma_inference.inputs.api.commands import Command, LocomotionCommand
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
+
+# ---------------------------------------------------------------------------
+# ROS2 string-to-command mapping
+# ---------------------------------------------------------------------------
+
+ROS2_COMMAND_MAP: dict[str, Enum] = {
+    "start": Command.START,
+    "stop": Command.STOP,
+    "init": Command.INIT,
+    "walk": LocomotionCommand.WALK,
+    "stand": LocomotionCommand.STAND,
+}
 
 
 class Ros2VelocityInput(VelocityInput):

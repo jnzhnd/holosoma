@@ -17,19 +17,10 @@ import numpy as np
 import pytest
 
 from holosoma_inference.config.config_types.task import InputSource
-from holosoma_inference.inputs.api.commands import (
-    JOYSTICK_BASE,
-    JOYSTICK_LOCOMOTION,
-    JOYSTICK_WBT,
-    KEYBOARD_BASE,
-    KEYBOARD_LOCOMOTION,
-    KEYBOARD_WBT,
-    ROS2_COMMAND_MAP,
-    Command,
-    DualModeCommand,
-    LocomotionCommand,
-    WbtCommand,
-)
+from holosoma_inference.inputs.api.commands import Command, DualModeCommand, LocomotionCommand, WbtCommand
+from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE, JOYSTICK_LOCOMOTION, JOYSTICK_WBT
+from holosoma_inference.inputs.impl.keyboard import KEYBOARD_BASE, KEYBOARD_LOCOMOTION, KEYBOARD_WBT
+from holosoma_inference.inputs.impl.ros2 import ROS2_COMMAND_MAP
 
 # ---------------------------------------------------------------------------
 # Fixtures: lightweight mock policy objects

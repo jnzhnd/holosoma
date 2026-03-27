@@ -10,7 +10,8 @@ from loguru import logger
 from termcolor import colored
 
 from holosoma_inference.config.config_types.inference import InferenceConfig
-from holosoma_inference.inputs.api.commands import JOYSTICK_WBT, KEYBOARD_WBT
+from holosoma_inference.inputs.impl.joystick import JOYSTICK_WBT
+from holosoma_inference.inputs.impl.keyboard import KEYBOARD_WBT
 from holosoma_inference.policies import BasePolicy
 from holosoma_inference.policies.wbt_utils import MotionClockUtil, PinocchioRobot, TimestepUtil
 from holosoma_inference.utils.clock import ClockSub
