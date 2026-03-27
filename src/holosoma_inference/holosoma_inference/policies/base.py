@@ -19,6 +19,7 @@ from termcolor import colored
 from holosoma_inference.config.config_types.inference import InferenceConfig
 from holosoma_inference.config.config_types.robot import RobotConfig
 from holosoma_inference.config.config_types.task import InputSource
+from holosoma_inference.inputs import create_input
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 from holosoma_inference.sdk import create_interface
 from holosoma_inference.utils.latency import LatencyTracker
@@ -355,46 +356,15 @@ class BasePolicy:
     def _create_input_providers(self):
         """Create and start input providers based on config.
 
-        Called after hardware init. Subclasses override _create_velocity_input
-        and _create_command_provider for policy-specific provider variants.
-
-        When both channels use the same interface source, a single
-        ``InterfaceInput`` object is shared between both slots.
+        When both channels use the same source, a single provider is shared
+        (important for KeyboardInput which pops from a shared queue).
         """
-        vel = self.config.task.velocity_input
-        other = self.config.task.other_input
+        self._velocity_input = create_input(self, self.config.task.velocity_input, "velocity")
 
-        # Fall back to keyboard when joystick hardware is unavailable
-        if not self.use_joystick:
-            if vel in (InputSource.interface, InputSource.joystick):
-                vel = InputSource.keyboard
-            if other in (InputSource.interface, InputSource.joystick):
-                other = InputSource.keyboard
-
-        # Ensure keyboard listener exists before creating providers (both subscribe)
-        if vel == InputSource.keyboard or other == InputSource.keyboard:
-            from holosoma_inference.inputs.impl.keyboard import _ensure_keyboard_listener
-
-            _ensure_keyboard_listener(self)
-
-        # When both channels use the same device type, share a single object
-        both_interface = (
-            vel in (InputSource.interface, InputSource.joystick)
-            and other in (InputSource.interface, InputSource.joystick)
-        )
-        both_keyboard = vel == InputSource.keyboard and other == InputSource.keyboard
-
-        if both_interface:
-            device = self._create_interface_input()
-            self._velocity_input = device
-            self._command_provider = device
-        elif both_keyboard:
-            device = self._create_keyboard_input()
-            self._velocity_input = device
-            self._command_provider = device
+        if self.config.task.velocity_input == self.config.task.other_input:
+            self._command_provider = self._velocity_input
         else:
-            self._velocity_input = self._create_velocity_input(vel)
-            self._command_provider = self._create_command_provider(other)
+            self._command_provider = create_input(self, self.config.task.other_input, "command")
 
         self._velocity_input.start()
         if self._command_provider is not self._velocity_input:
@@ -402,60 +372,6 @@ class BasePolicy:
 
     # Class attributes for keyboard mappings — subclasses override these.
     _keyboard_velocity_mapping = None
-
-    def _create_interface_input(self):
-        """Create a shared InterfaceInput for both velocity and commands."""
-        from holosoma_inference.inputs.impl.interface import InterfaceInput
-        from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE
-
-        return InterfaceInput(self.interface, self._joystick_command_mapping or JOYSTICK_BASE)
-
-    def _create_keyboard_input(self):
-        """Create a shared KeyboardInput for both velocity and commands."""
-        from holosoma_inference.inputs.impl.keyboard import KEYBOARD_BASE, KeyboardInput
-
-        listener = self._get_keyboard_listener()
-        queue = listener.subscribe() if listener else deque()
-        mapping = self._keyboard_command_mapping or KEYBOARD_BASE
-        return KeyboardInput(mapping, queue, self._keyboard_velocity_mapping)
-
-    def _create_velocity_input(self, source: InputSource):
-        """Create velocity input provider.
-
-        Uses ``_keyboard_velocity_mapping`` class attribute for keyboard.
-        """
-        if source == InputSource.keyboard:
-            return self._create_keyboard_input()
-        if source in (InputSource.interface, InputSource.joystick):
-            return self._create_interface_input()
-        if source == InputSource.ros2:
-            from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
-
-            return Ros2VelCmdProvider(self)
-        raise ValueError(f"Unknown velocity input source: {source}")
-
-    def _create_command_provider(self, source: InputSource):
-        """Create command provider.
-
-        Uses ``_keyboard_command_mapping`` / ``_joystick_command_mapping``
-        class attributes — subclasses just override those instead of this method.
-        """
-        if source == InputSource.keyboard:
-            return self._create_keyboard_input()
-        if source in (InputSource.interface, InputSource.joystick):
-            return self._create_interface_input()
-        if source == InputSource.ros2:
-            from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
-
-            return Ros2StateCommandProvider(self)
-        raise ValueError(f"Unknown command provider source: {source}")
-
-    def _get_keyboard_listener(self):
-        """Get the keyboard listener, checking shared hardware source if needed."""
-        listener = getattr(self, "_keyboard_listener", None)
-        if listener is None and hasattr(self, "_shared_hardware_source"):
-            listener = getattr(self._shared_hardware_source, "_keyboard_listener", None)
-        return listener
 
     def _init_ros_node(self):
         """Ensure rclpy is initialized and we have a ROS2 node."""

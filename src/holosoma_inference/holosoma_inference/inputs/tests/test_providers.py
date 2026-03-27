@@ -492,9 +492,9 @@ class TestInterfaceInput:
         device = InterfaceInput(interface, JOYSTICK_BASE)
         vc = device.poll_velocity()
 
-        assert vc.lin_vel[0] == pytest.approx(0.3)   # ly
+        assert vc.lin_vel[0] == pytest.approx(0.3)  # ly
         assert vc.lin_vel[1] == pytest.approx(-0.5)  # -lx
-        assert vc.ang_vel == pytest.approx(-0.7)      # -rx
+        assert vc.ang_vel == pytest.approx(-0.7)  # -rx
 
     def test_poll_commands_rising_edges(self, interface):
         from holosoma_inference.inputs.impl.interface import InterfaceInput
@@ -1026,8 +1026,6 @@ class TestDualModeSwitching:
         dual.secondary._handle_start_policy.assert_called_once()
 
     def test_joystick_state_carry_over(self):
-        from holosoma_inference.inputs.impl.interface import InterfaceInput
-
         dual = _make_dual()
         # Set key_states on primary device
         dual.primary._velocity_input.key_states = {"X": True, "A": False}
