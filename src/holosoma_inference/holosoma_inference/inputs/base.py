@@ -27,10 +27,6 @@ class VelocityInput(ABC):
     def poll(self) -> None:
         """Called each loop iteration. Override for polled sources (joystick)."""
 
-    def handle_key(self, keycode: str) -> bool:
-        """Handle a keyboard keypress. Return True if consumed."""
-        return False
-
 
 class OtherInput(ABC):
     """Provides discrete commands to a policy via command enums.
@@ -51,7 +47,3 @@ class OtherInput(ABC):
     def poll(self) -> list[Enum]:
         """Return all commands detected this cycle."""
         return []
-
-    def map_key(self, keycode: str) -> Enum | None:
-        """Map a keyboard keycode to a command, or None if unmapped."""
-        return self._mapping.get(keycode)

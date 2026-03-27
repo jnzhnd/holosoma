@@ -779,16 +779,6 @@ class BasePolicy:
     # Command Dispatch
     # ============================================================================
 
-    def handle_keyboard_button(self, keycode):
-        """Dispatch keyboard input: try velocity first, then map to command."""
-        if self._velocity_input.handle_key(keycode):
-            self._print_control_status()
-            return
-        cmd = self._other_input.map_key(keycode)
-        if cmd is not None:
-            self._dispatch_command(cmd)
-            self._print_control_status()
-
     def _dispatch_command(self, cmd):
         """Dispatch a command enum to the appropriate handler.
 

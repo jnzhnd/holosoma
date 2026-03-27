@@ -73,33 +73,28 @@ class DualModePolicy:
         logger.info(colored("Dual-mode ready. Press X (joystick) or x (keyboard) to switch policies.", "magenta"))
 
     def _setup_command_intercept(self):
-        """Inject SWITCH_MODE into mappings and patch keyboard/dispatch for routing.
+        """Inject SWITCH_MODE into mappings and patch dispatch for routing.
 
-        Two patches are needed:
-        1. ``handle_keyboard_button`` — the keyboard listener thread belongs to
-           the primary policy, so we redirect keyboard input to whichever policy
-           is currently active.
-        2. ``_dispatch_command`` — intercept SWITCH_MODE before it reaches the
-           active policy's normal dispatch chain.
+        The keyboard listener queues keycodes on the primary policy's
+        ``KeyboardListener``.  The run loop drains via the active policy's
+        ``_other_input.poll()``, so we wire the secondary's keyboard queue
+        to the primary's listener.  Only ``_dispatch_command`` needs patching
+        to intercept SWITCH_MODE.
         """
         from holosoma_inference.inputs.commands import DualModeCommand
+        from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
         # Inject the switch-mode key into both policies' other_input mappings
         for p in (self.primary, self.secondary):
             p._other_input._mapping["X"] = DualModeCommand.SWITCH_MODE
             p._other_input._mapping["x"] = DualModeCommand.SWITCH_MODE
 
-        # Patch keyboard handler to route to the active policy
-        self._orig_kb = {
-            id(self.primary): self.primary.handle_keyboard_button,
-            id(self.secondary): self.secondary.handle_keyboard_button,
-        }
-
-        def patched_kb(keycode):
-            self._orig_kb[id(self.active)](keycode)
-
-        self.primary.handle_keyboard_button = patched_kb
-        self.secondary.handle_keyboard_button = patched_kb
+        # Wire the secondary's keyboard queue to the primary's listener
+        # so the active policy can drain keycodes regardless of which one is active.
+        if isinstance(self.secondary._other_input, KeyboardOtherInput):
+            listener = getattr(self.primary, "_keyboard_listener", None)
+            if listener is not None:
+                self.secondary._other_input._queue = listener._queue
 
         # Patch _dispatch_command to intercept SWITCH_MODE
         self._orig_dispatch = {

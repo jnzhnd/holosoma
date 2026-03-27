@@ -46,6 +46,12 @@ class LocomotionCommand(Enum):
     ZERO_VELOCITY = auto()
     WALK = auto()
     STAND = auto()
+    VEL_FORWARD = auto()
+    VEL_BACKWARD = auto()
+    VEL_LEFT = auto()
+    VEL_RIGHT = auto()
+    ANG_VEL_LEFT = auto()
+    ANG_VEL_RIGHT = auto()
 
 
 class WbtCommand(Enum):
@@ -112,6 +118,13 @@ KEYBOARD_BASE: dict[str, Enum] = {
 KEYBOARD_LOCOMOTION: dict[str, Enum] = {
     **KEYBOARD_BASE,
     "=": LocomotionCommand.STAND_TOGGLE,
+    "z": LocomotionCommand.ZERO_VELOCITY,
+    "w": LocomotionCommand.VEL_FORWARD,
+    "s": LocomotionCommand.VEL_BACKWARD,
+    "a": LocomotionCommand.VEL_LEFT,
+    "d": LocomotionCommand.VEL_RIGHT,
+    "q": LocomotionCommand.ANG_VEL_LEFT,
+    "e": LocomotionCommand.ANG_VEL_RIGHT,
 }
 
 KEYBOARD_WBT: dict[str, Enum] = {

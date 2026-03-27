@@ -1,7 +1,6 @@
 import numpy as np
 from termcolor import colored
 
-from holosoma_inference.config.config_types.task import InputSource
 from holosoma_inference.inputs.commands import JOYSTICK_LOCOMOTION, KEYBOARD_LOCOMOTION
 
 from .base import BasePolicy
@@ -51,13 +50,6 @@ class LocomotionPolicy(BasePolicy):
             self.phase = np.array([[0.0, np.pi]])
             self.is_standing = False
 
-    def _create_velocity_input(self, source):
-        if source == InputSource.keyboard:
-            from holosoma_inference.inputs.keyboard import LocomotionKeyboardVelocityInput
-
-            return LocomotionKeyboardVelocityInput(self)
-        return super()._create_velocity_input(source)
-
     def _dispatch_command(self, cmd):
         from holosoma_inference.inputs.commands import LocomotionCommand
 
@@ -72,29 +64,24 @@ class LocomotionPolicy(BasePolicy):
         elif cmd == LocomotionCommand.STAND:
             self.stand_command[0, 0] = 0
             self.logger.info("ROS2 command: stand")
+        elif cmd == LocomotionCommand.VEL_FORWARD:
+            if self.stand_command[0, 0]:
+                self.lin_vel_command[0, 0] += 0.1
+        elif cmd == LocomotionCommand.VEL_BACKWARD:
+            if self.stand_command[0, 0]:
+                self.lin_vel_command[0, 0] -= 0.1
+        elif cmd == LocomotionCommand.VEL_LEFT:
+            if self.stand_command[0, 0]:
+                self.lin_vel_command[0, 1] += 0.1
+        elif cmd == LocomotionCommand.VEL_RIGHT:
+            if self.stand_command[0, 0]:
+                self.lin_vel_command[0, 1] -= 0.1
+        elif cmd == LocomotionCommand.ANG_VEL_LEFT:
+            self.ang_vel_command[0, 0] -= 0.1
+        elif cmd == LocomotionCommand.ANG_VEL_RIGHT:
+            self.ang_vel_command[0, 0] += 0.1
         else:
             super()._dispatch_command(cmd)
-
-    def _handle_velocity_control(self, keycode):
-        """Handle linear velocity control."""
-        if not self.stand_command[0, 0]:
-            return
-
-        if keycode == "w":
-            self.lin_vel_command[0, 0] += 0.1
-        elif keycode == "s":
-            self.lin_vel_command[0, 0] -= 0.1
-        elif keycode == "a":
-            self.lin_vel_command[0, 1] += 0.1
-        elif keycode == "d":
-            self.lin_vel_command[0, 1] -= 0.1
-
-    def _handle_angular_velocity_control(self, keycode):
-        """Handle angular velocity control."""
-        if keycode == "q":
-            self.ang_vel_command[0, 0] -= 0.1
-        elif keycode == "e":
-            self.ang_vel_command[0, 0] += 0.1
 
     def _handle_stand_command(self):
         """Handle stand command toggle."""

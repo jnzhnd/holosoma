@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import threading
+from collections import deque
 from typing import TYPE_CHECKING
 
 from holosoma_inference.inputs.base import OtherInput, VelocityInput
@@ -17,13 +18,14 @@ class KeyboardListener:
 
     Created lazily by keyboard providers and stored on the policy as
     ``_keyboard_listener``.  Multiple providers share one instance;
-    ``start()`` is idempotent.  Keypresses are dispatched through
-    ``policy.handle_keyboard_button()``.
+    ``start()`` is idempotent.  Keypresses are queued for the main loop
+    to drain via ``KeyboardOtherInput.poll()``.
     """
 
     def __init__(self, policy: BasePolicy) -> None:
         self._policy = policy
         self._started = False
+        self._queue: deque[str] = deque()
 
     def start(self) -> None:
         """Start the listener thread (idempotent, skipped for shared-hardware secondaries)."""
@@ -48,10 +50,7 @@ class KeyboardListener:
         from sshkeyboard import listen_keyboard
 
         def on_press(keycode):
-            try:
-                self._policy.handle_keyboard_button(keycode)
-            except AttributeError:
-                pass
+            self._queue.append(keycode)
 
         try:
             listener = listen_keyboard(on_press=on_press)
@@ -76,9 +75,11 @@ def _ensure_keyboard_listener(policy: BasePolicy) -> None:
 
 
 class KeyboardVelocityInput(VelocityInput):
-    """Base keyboard velocity — no keys handled.
+    """No-op keyboard velocity input.
 
-    Subclass for policy-specific velocity keys (e.g. WASD for locomotion).
+    Velocity for keyboard is handled via command enums in the OtherInput
+    mapping (e.g. LocomotionCommand.VEL_FORWARD for the 'w' key).
+    This class exists only to start the shared keyboard listener.
     """
 
     def start(self) -> None:
@@ -88,30 +89,31 @@ class KeyboardVelocityInput(VelocityInput):
 class KeyboardOtherInput(OtherInput):
     """Keyboard handler for discrete commands using a mapping dict.
 
-    Key-to-command translation is fully determined by the mapping passed
-    at construction time — no subclassing needed for policy-specific keys.
+    The shared ``KeyboardListener`` queues raw keycodes.  ``poll()`` drains
+    the queue, maps each keycode via the mapping dict, and returns the
+    resulting command enums — same pull pattern as joystick.
     """
+
+    def __init__(self, policy: BasePolicy, mapping: dict) -> None:
+        super().__init__(policy, mapping)
+        self._queue: deque[str] | None = None
 
     def start(self) -> None:
         _ensure_keyboard_listener(self.policy)
+        listener = getattr(self.policy, "_keyboard_listener", None)
+        if listener is not None:
+            self._queue = listener._queue
 
-
-# ---------------------------------------------------------------------------
-# Locomotion-specific velocity input (velocity is not enum-based)
-# ---------------------------------------------------------------------------
-
-
-class LocomotionKeyboardVelocityInput(KeyboardVelocityInput):
-    """Locomotion velocity keys: W/A/S/D (linear), Q/E (angular), Z (zero)."""
-
-    def handle_key(self, keycode: str) -> bool:
-        if keycode in ("w", "s", "a", "d"):
-            self.policy._handle_velocity_control(keycode)
-            return True
-        if keycode in ("q", "e"):
-            self.policy._handle_angular_velocity_control(keycode)
-            return True
-        if keycode == "z":
-            self.policy._handle_zero_velocity()
-            return True
-        return False
+    def poll(self) -> list:
+        if self._queue is None:
+            return []
+        commands = []
+        while True:
+            try:
+                keycode = self._queue.popleft()
+            except IndexError:
+                break
+            cmd = self._mapping.get(keycode)
+            if cmd is not None:
+                commands.append(cmd)
+        return commands
