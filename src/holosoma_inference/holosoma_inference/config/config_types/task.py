@@ -11,7 +11,8 @@ class InputSource(str, Enum):
     """Available input sources for velocity and other_input channels."""
 
     keyboard = "keyboard"
-    joystick = "joystick"
+    interface = "interface"
+    joystick = "joystick"  # evdev gamepad (Xbox/Logitech/Beitong) — not yet implemented
     ros2 = "ros2"
 
 
@@ -123,7 +124,7 @@ class TaskConfig:
 
         shortcut = None
         if self.use_joystick:
-            shortcut = InputSource.joystick
+            shortcut = InputSource.interface
         elif self.use_keyboard:
             shortcut = InputSource.keyboard
 

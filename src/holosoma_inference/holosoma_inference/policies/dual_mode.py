@@ -114,11 +114,11 @@ class DualModePolicy:
 
         # Carry over joystick key_states so edge detection doesn't see a false
         # rising edge on the X button (which is still physically held down).
-        from holosoma_inference.inputs.impl.joystick import JoystickVelCmdProvider
+        from holosoma_inference.inputs.impl.interface import InterfaceVelCmdProvider
 
         active_vel = self.active._velocity_input
         target_vel = target._velocity_input
-        if isinstance(active_vel, JoystickVelCmdProvider) and isinstance(target_vel, JoystickVelCmdProvider):
+        if isinstance(active_vel, InterfaceVelCmdProvider) and isinstance(target_vel, InterfaceVelCmdProvider):
             target_vel.key_states = active_vel.key_states.copy()
             target_vel.last_key_states = active_vel.key_states.copy()
 
@@ -145,8 +145,7 @@ class DualModePolicy:
 
                 vc = self.active._velocity_input.poll()
                 if vc is not None:
-                    self.active.lin_vel_command[0] = vc.lin_vel
-                    self.active.ang_vel_command[0, 0] = vc.ang_vel
+                    self.active._apply_velocity(vc)
                 for cmd in self.active._command_provider.poll():
                     self.active._dispatch_command(cmd)
                     self.active._print_control_status()

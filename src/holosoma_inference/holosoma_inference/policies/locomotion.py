@@ -1,7 +1,7 @@
 import numpy as np
 from termcolor import colored
 
-from holosoma_inference.inputs.api.commands import StateCommand
+from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 from holosoma_inference.inputs.impl.joystick import JOYSTICK_LOCOMOTION
 from holosoma_inference.inputs.impl.keyboard import KEYBOARD_LOCOMOTION, KEYBOARD_VELOCITY_LOCOMOTION
 
@@ -16,6 +16,12 @@ class LocomotionPolicy(BasePolicy):
     def __init__(self, config):
         super().__init__(config)
         self.is_standing = False
+
+    def _apply_velocity(self, vc: VelCmd) -> None:
+        """Gate velocity by stand_command — zero when standing."""
+        s = self.stand_command[0, 0]
+        self.lin_vel_command[0] = (vc.lin_vel[0] * s, vc.lin_vel[1] * s)
+        self.ang_vel_command[0, 0] = vc.ang_vel * s
 
     def get_current_obs_buffer_dict(self, robot_state_data):
         current_obs_buffer_dict = super().get_current_obs_buffer_dict(robot_state_data)

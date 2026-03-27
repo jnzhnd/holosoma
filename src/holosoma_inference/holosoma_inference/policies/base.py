@@ -19,7 +19,7 @@ from termcolor import colored
 from holosoma_inference.config.config_types.inference import InferenceConfig
 from holosoma_inference.config.config_types.robot import RobotConfig
 from holosoma_inference.config.config_types.task import InputSource
-from holosoma_inference.inputs.api.commands import StateCommand
+from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 from holosoma_inference.sdk import create_interface
 from holosoma_inference.utils.latency import LatencyTracker
 from holosoma_inference.utils.math.quat import quat_rotate_inverse
@@ -149,10 +149,10 @@ class BasePolicy:
         if hasattr(self, "_shared_hardware_source"):
             self.interface = self._shared_hardware_source.interface
             return
-        # Derive use_joystick for SDK: True if joystick is used for either channel
+        # Derive use_joystick for SDK: True if interface/joystick is used for either channel
         vel = self.config.task.velocity_input
         other = self.config.task.other_input
-        need_joystick = InputSource.joystick in (vel, other)
+        need_joystick = bool({InputSource.interface, InputSource.joystick} & {vel, other})
         self.interface = create_interface(
             self.robot_config,
             self.config.task.domain_id,
@@ -331,8 +331,8 @@ class BasePolicy:
         other = self.config.task.other_input
         sources = {vel, other}
 
-        # Joystick (needed if either channel uses it)
-        if InputSource.joystick in sources:
+        # Joystick hardware (needed if either channel uses interface or joystick)
+        if {InputSource.interface, InputSource.joystick} & sources:
             self._init_joystick_handler()
         else:
             self.use_joystick = False
@@ -361,11 +361,11 @@ class BasePolicy:
         vel = self.config.task.velocity_input
         other = self.config.task.other_input
 
-        # Fall back to keyboard when joystick is unavailable
+        # Fall back to keyboard when joystick hardware is unavailable
         if not self.use_joystick:
-            if vel == InputSource.joystick:
+            if vel in (InputSource.interface, InputSource.joystick):
                 vel = InputSource.keyboard
-            if other == InputSource.joystick:
+            if other in (InputSource.interface, InputSource.joystick):
                 other = InputSource.keyboard
 
         # Ensure keyboard listener exists before creating providers (both subscribe)
@@ -378,10 +378,10 @@ class BasePolicy:
         self._command_provider = self._create_command_provider(other)
 
         # Wire shared joystick state when both channels use joystick
-        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelCmdProvider
+        from holosoma_inference.inputs.impl.interface import InterfaceStateCommandProvider, InterfaceVelCmdProvider
 
-        if isinstance(self._command_provider, JoystickStateCommandProvider) and isinstance(
-            self._velocity_input, JoystickVelCmdProvider
+        if isinstance(self._command_provider, InterfaceStateCommandProvider) and isinstance(
+            self._velocity_input, InterfaceVelCmdProvider
         ):
             self._command_provider._shared_velocity = self._velocity_input
 
@@ -402,10 +402,10 @@ class BasePolicy:
             listener = self._get_keyboard_listener()
             queue = listener.subscribe() if listener else deque()
             return KeyboardVelCmdProvider(queue, self._keyboard_velocity_mapping)
-        if source == InputSource.joystick:
-            from holosoma_inference.inputs.impl.joystick import JoystickVelCmdProvider
+        if source in (InputSource.interface, InputSource.joystick):
+            from holosoma_inference.inputs.impl.interface import InterfaceVelCmdProvider
 
-            return JoystickVelCmdProvider(self)
+            return InterfaceVelCmdProvider(self.interface)
         if source == InputSource.ros2:
             from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
@@ -425,10 +425,11 @@ class BasePolicy:
             queue = listener.subscribe() if listener else deque()
             mapping = self._keyboard_command_mapping or KEYBOARD_BASE
             return KeyboardStateCommandProvider(mapping, queue)
-        if source == InputSource.joystick:
-            from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE, JoystickStateCommandProvider
+        if source in (InputSource.interface, InputSource.joystick):
+            from holosoma_inference.inputs.impl.interface import InterfaceStateCommandProvider
+            from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE
 
-            return JoystickStateCommandProvider(self, self._joystick_command_mapping or JOYSTICK_BASE)
+            return InterfaceStateCommandProvider(self.interface, self._joystick_command_mapping or JOYSTICK_BASE)
         if source == InputSource.ros2:
             from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
@@ -804,6 +805,19 @@ class BasePolicy:
         self.phase = np.fmod(phase_tp1 + np.pi, 2 * np.pi) - np.pi
 
     # ============================================================================
+    # Velocity Hook
+    # ============================================================================
+
+    def _apply_velocity(self, vc: VelCmd) -> None:
+        """Apply a velocity command to the policy state.
+
+        Called from the run loop when a provider returns a non-None VelCmd.
+        Subclasses can override to add gating (e.g. stand_command in locomotion).
+        """
+        self.lin_vel_command[0] = vc.lin_vel
+        self.ang_vel_command[0, 0] = vc.ang_vel
+
+    # ============================================================================
     # Command Dispatch
     # ============================================================================
 
@@ -892,8 +906,7 @@ class BasePolicy:
 
                 vc = self._velocity_input.poll()
                 if vc is not None:
-                    self.lin_vel_command[0] = vc.lin_vel
-                    self.ang_vel_command[0, 0] = vc.ang_vel
+                    self._apply_velocity(vc)
                 for cmd in self._command_provider.poll():
                     self._dispatch_command(cmd)
                     self._print_control_status()
