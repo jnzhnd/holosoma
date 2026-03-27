@@ -60,7 +60,10 @@ class JoystickVelocityInput(VelocityInput):
             self.policy.stand_command,
             False,
         )
-        return VelocityCommand(lin_vel, ang_vel)
+        return VelocityCommand(
+            (float(lin_vel[0, 0]), float(lin_vel[0, 1])),
+            float(ang_vel[0, 0]),
+        )
 
 
 class JoystickStateCommandProvider(StateCommandProvider):

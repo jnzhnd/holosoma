@@ -169,7 +169,10 @@ class KeyboardVelocityInput(VelocityInput):
                 else:
                     self._ang_vel[0, col] += delta
 
-        return VelocityCommand(self._lin_vel.copy(), self._ang_vel.copy())
+        return VelocityCommand(
+            (float(self._lin_vel[0, 0]), float(self._lin_vel[0, 1])),
+            float(self._ang_vel[0, 0]),
+        )
 
     def zero(self) -> None:
         """Reset velocity state to zero."""

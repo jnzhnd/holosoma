@@ -15,18 +15,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, auto
 
-import numpy as np
-
 
 @dataclass(frozen=True)
 class VelocityCommand:
-    """Absolute velocity state emitted by VelocityInput providers.
+    """Absolute velocity state emitted by VelocityInput providers."""
 
-    Each field matches the shape used by the policy's internal state.
-    """
-
-    lin_vel: np.ndarray  # shape [1, 2] — linear x, y (m/s)
-    ang_vel: np.ndarray  # shape [1, 1] — angular z (rad/s)
+    lin_vel: tuple[float, float]  # linear x, y (m/s)
+    ang_vel: float  # angular z (rad/s)
 
 
 class StateCommand(Enum):

@@ -888,8 +888,8 @@ class BasePolicy:
 
                 vc = self._velocity_input.poll()
                 if vc is not None:
-                    self.lin_vel_command = vc.lin_vel
-                    self.ang_vel_command = vc.ang_vel
+                    self.lin_vel_command[0] = vc.lin_vel
+                    self.ang_vel_command[0, 0] = vc.ang_vel
                 for cmd in self._command_provider.poll():
                     self._dispatch_command(cmd)
                     self._print_control_status()

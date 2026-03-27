@@ -49,7 +49,10 @@ class Ros2VelocityInput(VelocityInput):
         self._ang_vel[0, 0] = max(-1.0, min(1.0, msg.twist.angular.z))
 
     def poll(self) -> VelocityCommand:
-        return VelocityCommand(self._lin_vel.copy(), self._ang_vel.copy())
+        return VelocityCommand(
+            (float(self._lin_vel[0, 0]), float(self._lin_vel[0, 1])),
+            float(self._ang_vel[0, 0]),
+        )
 
 
 class Ros2StateCommandProvider(StateCommandProvider):

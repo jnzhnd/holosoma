@@ -306,9 +306,9 @@ class TestKeyboardVelocityInput:
         queue.append("w")
         vc = prov.poll()
         assert isinstance(vc, VelocityCommand)
-        np.testing.assert_almost_equal(vc.lin_vel[0, 0], 0.1)
-        np.testing.assert_almost_equal(vc.lin_vel[0, 1], 0.0)
-        np.testing.assert_almost_equal(vc.ang_vel[0, 0], 0.0)
+        assert pytest.approx(vc.lin_vel[0]) == 0.1
+        assert pytest.approx(vc.lin_vel[1]) == 0.0
+        assert pytest.approx(vc.ang_vel) == 0.0
 
     def test_poll_accumulates_increments(self):
         from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
@@ -317,8 +317,8 @@ class TestKeyboardVelocityInput:
         prov = KeyboardVelocityInput(queue, KEYBOARD_VELOCITY_LOCOMOTION)
         queue.extend(["w", "w", "a"])
         vc = prov.poll()
-        np.testing.assert_almost_equal(vc.lin_vel[0, 0], 0.2)
-        np.testing.assert_almost_equal(vc.lin_vel[0, 1], 0.1)
+        assert pytest.approx(vc.lin_vel[0]) == 0.2
+        assert pytest.approx(vc.lin_vel[1]) == 0.1
 
     def test_poll_angular_velocity(self):
         from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
@@ -327,10 +327,10 @@ class TestKeyboardVelocityInput:
         prov = KeyboardVelocityInput(queue, KEYBOARD_VELOCITY_LOCOMOTION)
         queue.extend(["q", "e", "e"])
         vc = prov.poll()
-        np.testing.assert_almost_equal(vc.ang_vel[0, 0], 0.1)  # -0.1 + 0.1 + 0.1
+        assert pytest.approx(vc.ang_vel) == 0.1  # -0.1 + 0.1 + 0.1
 
-    def test_poll_returns_copy(self):
-        """Returned arrays are copies, not references to internal state."""
+    def test_poll_returns_snapshot(self):
+        """Returned values are snapshots, not affected by later polls."""
         from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
 
         queue = deque()
@@ -339,9 +339,8 @@ class TestKeyboardVelocityInput:
         vc1 = prov.poll()
         queue.append("w")
         vc2 = prov.poll()
-        # vc1 should still show 0.1 (not 0.2)
-        np.testing.assert_almost_equal(vc1.lin_vel[0, 0], 0.1)
-        np.testing.assert_almost_equal(vc2.lin_vel[0, 0], 0.2)
+        assert pytest.approx(vc1.lin_vel[0]) == 0.1
+        assert pytest.approx(vc2.lin_vel[0]) == 0.2
 
     def test_zero_resets_state(self):
         from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
@@ -352,9 +351,9 @@ class TestKeyboardVelocityInput:
         prov.poll()
         prov.zero()
         vc = prov.poll()
-        np.testing.assert_almost_equal(vc.lin_vel[0, 0], 0.0)
-        np.testing.assert_almost_equal(vc.lin_vel[0, 1], 0.0)
-        np.testing.assert_almost_equal(vc.ang_vel[0, 0], 0.0)
+        assert pytest.approx(vc.lin_vel[0]) == 0.0
+        assert pytest.approx(vc.lin_vel[1]) == 0.0
+        assert pytest.approx(vc.ang_vel) == 0.0
 
     def test_no_velocity_keys_returns_none(self):
         """When no velocity keys mapping, poll() returns None and clears queue."""
@@ -373,7 +372,7 @@ class TestKeyboardVelocityInput:
         prov = KeyboardVelocityInput(queue, KEYBOARD_VELOCITY_LOCOMOTION)
         queue.extend(["]", "o", "w"])  # ] and o are command keys, not velocity
         vc = prov.poll()
-        np.testing.assert_almost_equal(vc.lin_vel[0, 0], 0.1)  # only w applied
+        assert pytest.approx(vc.lin_vel[0]) == 0.1  # only w applied
 
     def test_broadcast_isolation(self):
         """Two providers on separate subscriber queues get independent events."""
@@ -382,14 +381,13 @@ class TestKeyboardVelocityInput:
         q1 = deque()
         q2 = deque()
         vel = KeyboardVelocityInput(q1, KEYBOARD_VELOCITY_LOCOMOTION)
-        cmd_queue = q2  # command provider would use this
 
         # Simulate broadcast
         q1.append("w")
         q2.append("w")
 
         vc = vel.poll()
-        np.testing.assert_almost_equal(vc.lin_vel[0, 0], 0.1)
+        assert pytest.approx(vc.lin_vel[0]) == 0.1
         assert len(q2) == 1  # command queue untouched
 
 
@@ -421,8 +419,8 @@ class TestJoystickVelocityInput:
         vc = prov.poll()
 
         assert isinstance(vc, VelocityCommand)
-        np.testing.assert_array_equal(vc.lin_vel, new_lin)
-        np.testing.assert_array_equal(vc.ang_vel, new_ang)
+        assert vc.lin_vel == (0.5, 0.0)
+        assert vc.ang_vel == pytest.approx(0.1)
         assert prov.key_states == {"A": True}
 
     def test_poll_preserves_last_key_states(self, policy):
@@ -541,9 +539,8 @@ class TestRos2VelocityInput:
         vc = prov.poll()
 
         assert isinstance(vc, VelocityCommand)
-        np.testing.assert_almost_equal(vc.lin_vel[0, 0], 0.5)
-        np.testing.assert_almost_equal(vc.lin_vel[0, 1], -0.3)
-        np.testing.assert_almost_equal(vc.ang_vel[0, 0], 0.8)
+        assert vc.lin_vel == pytest.approx((0.5, -0.3))
+        assert vc.ang_vel == pytest.approx(0.8)
 
     def test_callback_clamps_to_range(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
@@ -558,12 +555,11 @@ class TestRos2VelocityInput:
         prov._callback(msg)
         vc = prov.poll()
 
-        assert vc.lin_vel[0, 0] == 1.0
-        assert vc.lin_vel[0, 1] == -1.0
-        assert vc.ang_vel[0, 0] == 1.0
+        assert vc.lin_vel == (1.0, -1.0)
+        assert vc.ang_vel == 1.0
 
-    def test_poll_returns_copy(self, policy):
-        """Returned VelocityCommand arrays are copies of internal state."""
+    def test_frozen_values_stable(self, policy):
+        """Frozen dataclass with plain types — values can't change after creation."""
         from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
 
         prov = Ros2VelocityInput(policy)
@@ -576,9 +572,8 @@ class TestRos2VelocityInput:
         prov._callback(msg)
         vc1 = prov.poll()
         vc2 = prov.poll()
-        # Modify vc1, vc2 should be unaffected
-        vc1.lin_vel[0, 0] = 999.0
-        np.testing.assert_almost_equal(vc2.lin_vel[0, 0], 0.5)
+        assert vc1.lin_vel == vc2.lin_vel
+        assert vc1.ang_vel == vc2.ang_vel
 
 
 class TestRos2StateCommandProvider:
@@ -1056,7 +1051,7 @@ class TestRos2VelocityEdgeCases:
         )
         prov._callback(msg)
         vc = prov.poll()
-        assert vc.ang_vel[0, 0] == -1.0
+        assert vc.ang_vel == -1.0
 
     def test_callback_exact_boundary_values(self, policy):
         """Values exactly at +/-1.0 pass through unchanged."""
@@ -1071,9 +1066,8 @@ class TestRos2VelocityEdgeCases:
         )
         prov._callback(msg)
         vc = prov.poll()
-        assert vc.lin_vel[0, 0] == 1.0
-        assert vc.lin_vel[0, 1] == -1.0
-        assert vc.ang_vel[0, 0] == 1.0
+        assert vc.lin_vel == (1.0, -1.0)
+        assert vc.ang_vel == 1.0
 
     def test_callback_zero_passes_through(self, policy):
         """Zero velocity is not clamped or modified."""
@@ -1088,9 +1082,8 @@ class TestRos2VelocityEdgeCases:
         )
         prov._callback(msg)
         vc = prov.poll()
-        assert vc.lin_vel[0, 0] == 0.0
-        assert vc.lin_vel[0, 1] == 0.0
-        assert vc.ang_vel[0, 0] == 0.0
+        assert vc.lin_vel == (0.0, 0.0)
+        assert vc.ang_vel == 0.0
 
 
 class TestRos2StateCommandProviderEdgeCases:
@@ -1144,13 +1137,16 @@ class TestJoystickStandaloneEdgeCases:
 
 class TestVelocityCommand:
     def test_frozen(self):
-        vc = VelocityCommand(np.zeros((1, 2)), np.zeros((1, 1)))
+        vc = VelocityCommand((0.0, 0.0), 0.0)
         with pytest.raises(AttributeError):
-            vc.lin_vel = np.ones((1, 2))
+            vc.lin_vel = (1.0, 1.0)
 
     def test_equality(self):
-        a = VelocityCommand(np.array([[1.0, 2.0]]), np.array([[3.0]]))
-        b = VelocityCommand(np.array([[1.0, 2.0]]), np.array([[3.0]]))
-        # frozen dataclass with numpy arrays — identity differs but values match
-        np.testing.assert_array_equal(a.lin_vel, b.lin_vel)
-        np.testing.assert_array_equal(a.ang_vel, b.ang_vel)
+        a = VelocityCommand((1.0, 2.0), 3.0)
+        b = VelocityCommand((1.0, 2.0), 3.0)
+        assert a == b
+
+    def test_fields(self):
+        vc = VelocityCommand((0.5, -0.3), 0.8)
+        assert vc.lin_vel == (0.5, -0.3)
+        assert vc.ang_vel == 0.8
