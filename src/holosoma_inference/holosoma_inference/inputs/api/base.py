@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import TYPE_CHECKING
+
+from holosoma_inference.inputs.api.commands import StateCommand
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
@@ -28,20 +29,20 @@ class VelocityInput(ABC):
         """Called each loop iteration. Override for polled sources (joystick)."""
 
 
-class OtherInput(ABC):
-    """Provides discrete commands to a policy via command enums.
+class StateCommandProvider(ABC):
+    """Provides discrete commands to a policy via ``StateCommand`` enums.
 
     Implementations translate device-specific inputs (buttons, keys, messages)
-    into command enums defined in ``holosoma_inference.inputs.commands``.
-    The policy dispatches these commands via ``_dispatch_command()``.
+    into ``StateCommand`` values.  The policy dispatches these commands via
+    ``_dispatch_command()``.
     """
 
-    def __init__(self, mapping: dict[str, Enum]):
+    def __init__(self, mapping: dict[str, StateCommand]):
         self._mapping = mapping
 
     def start(self) -> None:
         """Initialize the input source. Override if needed."""
 
-    def poll(self) -> list[Enum]:
+    def poll(self) -> list[StateCommand]:
         """Return all commands detected this cycle."""
         return []

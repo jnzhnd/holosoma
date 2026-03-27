@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import TYPE_CHECKING
 
-from holosoma_inference.inputs.api.base import OtherInput, VelocityInput
-from holosoma_inference.inputs.api.commands import Command, LocomotionCommand, WbtCommand
+from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
+from holosoma_inference.inputs.api.commands import StateCommand
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
@@ -15,28 +14,28 @@ if TYPE_CHECKING:
 # Joystick mappings
 # ---------------------------------------------------------------------------
 
-JOYSTICK_BASE: dict[str, Enum] = {
-    "A": Command.START,
-    "B": Command.STOP,
-    "Y": Command.INIT,
-    "up": Command.KP_UP,
-    "down": Command.KP_DOWN,
-    "left": Command.KP_DOWN_FINE,
-    "right": Command.KP_UP_FINE,
-    "F1": Command.KP_RESET,
-    "select": Command.NEXT_POLICY,
-    "L1+R1": Command.KILL,
+JOYSTICK_BASE: dict[str, StateCommand] = {
+    "A": StateCommand.START,
+    "B": StateCommand.STOP,
+    "Y": StateCommand.INIT,
+    "up": StateCommand.KP_UP,
+    "down": StateCommand.KP_DOWN,
+    "left": StateCommand.KP_DOWN_FINE,
+    "right": StateCommand.KP_UP_FINE,
+    "F1": StateCommand.KP_RESET,
+    "select": StateCommand.NEXT_POLICY,
+    "L1+R1": StateCommand.KILL,
 }
 
-JOYSTICK_LOCOMOTION: dict[str, Enum] = {
+JOYSTICK_LOCOMOTION: dict[str, StateCommand] = {
     **JOYSTICK_BASE,
-    "start": LocomotionCommand.STAND_TOGGLE,
-    "L2": LocomotionCommand.ZERO_VELOCITY,
+    "start": StateCommand.STAND_TOGGLE,
+    "L2": StateCommand.ZERO_VELOCITY,
 }
 
-JOYSTICK_WBT: dict[str, Enum] = {
+JOYSTICK_WBT: dict[str, StateCommand] = {
     **JOYSTICK_BASE,
-    "start": WbtCommand.START_MOTION_CLIP,
+    "start": StateCommand.START_MOTION_CLIP,
 }
 
 
@@ -65,21 +64,21 @@ class JoystickVelocityInput(VelocityInput):
         )
 
 
-class JoystickOtherInput(OtherInput):
+class JoystickStateCommandProvider(StateCommandProvider):
     """Reads joystick buttons and translates rising edges to commands.
 
     If the velocity provider is also joystick, reads cached button states
     from it. Otherwise, reads buttons directly from the SDK.
     """
 
-    def __init__(self, policy: BasePolicy, mapping: dict[str, Enum]):
+    def __init__(self, policy: BasePolicy, mapping: dict[str, StateCommand]):
         super().__init__(mapping)
         self.policy = policy
         self._shared_velocity: JoystickVelocityInput | None = None
         self._key_states: dict[str, bool] = {}
         self._last_key_states: dict[str, bool] = {}
 
-    def poll(self) -> list[Enum]:
+    def poll(self) -> list[StateCommand]:
         if self._shared_velocity is not None:
             key_states = self._shared_velocity.key_states
             last_key_states = self._shared_velocity.last_key_states
@@ -98,7 +97,7 @@ class JoystickOtherInput(OtherInput):
             last_key_states = self._last_key_states
 
         # Edge detection: return commands for rising edges only
-        commands: list[Enum] = []
+        commands: list[StateCommand] = []
         for key, is_pressed in key_states.items():
             if is_pressed and not last_key_states.get(key, False):
                 cmd = self._mapping.get(key)

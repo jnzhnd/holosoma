@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from collections import deque
-from enum import Enum
 from typing import TYPE_CHECKING
 
-from holosoma_inference.inputs.api.base import OtherInput, VelocityInput
-from holosoma_inference.inputs.api.commands import Command, LocomotionCommand
+from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
+from holosoma_inference.inputs.api.commands import StateCommand
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
@@ -16,12 +15,12 @@ if TYPE_CHECKING:
 # ROS2 string-to-command mapping
 # ---------------------------------------------------------------------------
 
-ROS2_COMMAND_MAP: dict[str, Enum] = {
-    "start": Command.START,
-    "stop": Command.STOP,
-    "init": Command.INIT,
-    "walk": LocomotionCommand.WALK,
-    "stand": LocomotionCommand.STAND,
+ROS2_COMMAND_MAP: dict[str, StateCommand] = {
+    "start": StateCommand.START,
+    "stop": StateCommand.STOP,
+    "init": StateCommand.INIT,
+    "walk": StateCommand.WALK,
+    "stand": StateCommand.STAND,
 }
 
 
@@ -43,7 +42,7 @@ class Ros2VelocityInput(VelocityInput):
         self.policy.ang_vel_command[0, 0] = max(-1.0, min(1.0, msg.twist.angular.z))
 
 
-class Ros2OtherInput(OtherInput):
+class Ros2StateCommandProvider(StateCommandProvider):
     """Subscribes to ROS2 String topic for discrete commands.
 
     Incoming string commands are mapped to enum values via ``ROS2_COMMAND_MAP``
@@ -53,7 +52,7 @@ class Ros2OtherInput(OtherInput):
     def __init__(self, policy: BasePolicy):
         super().__init__({})  # ROS2 uses its own string-to-command map
         self.policy = policy
-        self._queue: deque[Enum] = deque()
+        self._queue: deque[StateCommand] = deque()
 
     def start(self) -> None:
         self.policy._init_ros_node()
@@ -72,9 +71,9 @@ class Ros2OtherInput(OtherInput):
         else:
             self.policy.logger.warning(f"ROS2 command: unknown command '{cmd_str}'")
 
-    def poll(self) -> list[Enum]:
+    def poll(self) -> list[StateCommand]:
         """Drain all queued commands."""
-        commands: list[Enum] = []
+        commands: list[StateCommand] = []
         while True:
             try:
                 commands.append(self._queue.popleft())

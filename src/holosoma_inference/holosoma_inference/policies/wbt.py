@@ -413,9 +413,9 @@ class WholeBodyTrackingPolicy(BasePolicy):
             self.logger.info(colored("Starting motion clip", "blue"))
 
     def _dispatch_command(self, cmd):
-        from holosoma_inference.inputs.api.commands import WbtCommand
+        from holosoma_inference.inputs.api.commands import StateCommand
 
-        if cmd == WbtCommand.START_MOTION_CLIP:
+        if cmd == StateCommand.START_MOTION_CLIP:
             self._handle_start_motion_clip()
         else:
             super()._dispatch_command(cmd)

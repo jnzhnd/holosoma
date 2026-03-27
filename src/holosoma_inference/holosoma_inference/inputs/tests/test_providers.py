@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 from holosoma_inference.config.config_types.task import InputSource
-from holosoma_inference.inputs.api.commands import Command, DualModeCommand, LocomotionCommand, WbtCommand
+from holosoma_inference.inputs.api.commands import StateCommand
 from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE, JOYSTICK_LOCOMOTION, JOYSTICK_WBT
 from holosoma_inference.inputs.impl.keyboard import KEYBOARD_BASE, KEYBOARD_LOCOMOTION, KEYBOARD_WBT
 from holosoma_inference.inputs.impl.ros2 import ROS2_COMMAND_MAP
@@ -40,7 +40,7 @@ def _make_policy(**overrides):
     p.config = SimpleNamespace(
         task=SimpleNamespace(
             ros_cmd_vel_topic="cmd_vel",
-            ros_other_input_topic="holosoma/other_input",
+            ros_command_provider_topic="holosoma/other_input",
         )
     )
     for k, v in overrides.items():
@@ -60,58 +60,58 @@ def policy():
 
 class TestCommandMappings:
     def test_joystick_base_has_core_commands(self):
-        assert JOYSTICK_BASE["A"] == Command.START
-        assert JOYSTICK_BASE["B"] == Command.STOP
-        assert JOYSTICK_BASE["Y"] == Command.INIT
-        assert JOYSTICK_BASE["L1+R1"] == Command.KILL
-        assert JOYSTICK_BASE["select"] == Command.NEXT_POLICY
+        assert JOYSTICK_BASE["A"] == StateCommand.START
+        assert JOYSTICK_BASE["B"] == StateCommand.STOP
+        assert JOYSTICK_BASE["Y"] == StateCommand.INIT
+        assert JOYSTICK_BASE["L1+R1"] == StateCommand.KILL
+        assert JOYSTICK_BASE["select"] == StateCommand.NEXT_POLICY
 
     def test_joystick_locomotion_extends_base(self):
-        assert JOYSTICK_LOCOMOTION["A"] == Command.START  # inherited
-        assert JOYSTICK_LOCOMOTION["start"] == LocomotionCommand.STAND_TOGGLE
-        assert JOYSTICK_LOCOMOTION["L2"] == LocomotionCommand.ZERO_VELOCITY
+        assert JOYSTICK_LOCOMOTION["A"] == StateCommand.START  # inherited
+        assert JOYSTICK_LOCOMOTION["start"] == StateCommand.STAND_TOGGLE
+        assert JOYSTICK_LOCOMOTION["L2"] == StateCommand.ZERO_VELOCITY
 
     def test_joystick_wbt_extends_base(self):
-        assert JOYSTICK_WBT["A"] == Command.START  # inherited
-        assert JOYSTICK_WBT["start"] == WbtCommand.START_MOTION_CLIP
+        assert JOYSTICK_WBT["A"] == StateCommand.START  # inherited
+        assert JOYSTICK_WBT["start"] == StateCommand.START_MOTION_CLIP
 
     def test_keyboard_base_has_core_commands(self):
-        assert KEYBOARD_BASE["]"] == Command.START
-        assert KEYBOARD_BASE["o"] == Command.STOP
-        assert KEYBOARD_BASE["i"] == Command.INIT
-        assert KEYBOARD_BASE["1"] == Command.SWITCH_POLICY_1
-        assert KEYBOARD_BASE["9"] == Command.SWITCH_POLICY_9
+        assert KEYBOARD_BASE["]"] == StateCommand.START
+        assert KEYBOARD_BASE["o"] == StateCommand.STOP
+        assert KEYBOARD_BASE["i"] == StateCommand.INIT
+        assert KEYBOARD_BASE["1"] == StateCommand.SWITCH_POLICY_1
+        assert KEYBOARD_BASE["9"] == StateCommand.SWITCH_POLICY_9
 
     def test_keyboard_base_kp_commands(self):
-        assert KEYBOARD_BASE["v"] == Command.KP_DOWN_FINE
-        assert KEYBOARD_BASE["b"] == Command.KP_UP_FINE
-        assert KEYBOARD_BASE["f"] == Command.KP_DOWN
-        assert KEYBOARD_BASE["g"] == Command.KP_UP
-        assert KEYBOARD_BASE["r"] == Command.KP_RESET
+        assert KEYBOARD_BASE["v"] == StateCommand.KP_DOWN_FINE
+        assert KEYBOARD_BASE["b"] == StateCommand.KP_UP_FINE
+        assert KEYBOARD_BASE["f"] == StateCommand.KP_DOWN
+        assert KEYBOARD_BASE["g"] == StateCommand.KP_UP
+        assert KEYBOARD_BASE["r"] == StateCommand.KP_RESET
 
     def test_keyboard_locomotion_extends_base(self):
-        assert KEYBOARD_LOCOMOTION["]"] == Command.START  # inherited
-        assert KEYBOARD_LOCOMOTION["="] == LocomotionCommand.STAND_TOGGLE
+        assert KEYBOARD_LOCOMOTION["]"] == StateCommand.START  # inherited
+        assert KEYBOARD_LOCOMOTION["="] == StateCommand.STAND_TOGGLE
 
     def test_keyboard_locomotion_has_velocity_keys(self):
-        assert KEYBOARD_LOCOMOTION["w"] == LocomotionCommand.VEL_FORWARD
-        assert KEYBOARD_LOCOMOTION["s"] == LocomotionCommand.VEL_BACKWARD
-        assert KEYBOARD_LOCOMOTION["a"] == LocomotionCommand.VEL_LEFT
-        assert KEYBOARD_LOCOMOTION["d"] == LocomotionCommand.VEL_RIGHT
-        assert KEYBOARD_LOCOMOTION["q"] == LocomotionCommand.ANG_VEL_LEFT
-        assert KEYBOARD_LOCOMOTION["e"] == LocomotionCommand.ANG_VEL_RIGHT
-        assert KEYBOARD_LOCOMOTION["z"] == LocomotionCommand.ZERO_VELOCITY
+        assert KEYBOARD_LOCOMOTION["w"] == StateCommand.VEL_FORWARD
+        assert KEYBOARD_LOCOMOTION["s"] == StateCommand.VEL_BACKWARD
+        assert KEYBOARD_LOCOMOTION["a"] == StateCommand.VEL_LEFT
+        assert KEYBOARD_LOCOMOTION["d"] == StateCommand.VEL_RIGHT
+        assert KEYBOARD_LOCOMOTION["q"] == StateCommand.ANG_VEL_LEFT
+        assert KEYBOARD_LOCOMOTION["e"] == StateCommand.ANG_VEL_RIGHT
+        assert KEYBOARD_LOCOMOTION["z"] == StateCommand.ZERO_VELOCITY
 
     def test_keyboard_wbt_extends_base(self):
-        assert KEYBOARD_WBT["]"] == Command.START  # inherited
-        assert KEYBOARD_WBT["s"] == WbtCommand.START_MOTION_CLIP
+        assert KEYBOARD_WBT["]"] == StateCommand.START  # inherited
+        assert KEYBOARD_WBT["s"] == StateCommand.START_MOTION_CLIP
 
     def test_ros2_command_map(self):
-        assert ROS2_COMMAND_MAP["start"] == Command.START
-        assert ROS2_COMMAND_MAP["stop"] == Command.STOP
-        assert ROS2_COMMAND_MAP["init"] == Command.INIT
-        assert ROS2_COMMAND_MAP["walk"] == LocomotionCommand.WALK
-        assert ROS2_COMMAND_MAP["stand"] == LocomotionCommand.STAND
+        assert ROS2_COMMAND_MAP["start"] == StateCommand.START
+        assert ROS2_COMMAND_MAP["stop"] == StateCommand.STOP
+        assert ROS2_COMMAND_MAP["init"] == StateCommand.INIT
+        assert ROS2_COMMAND_MAP["walk"] == StateCommand.WALK
+        assert ROS2_COMMAND_MAP["stand"] == StateCommand.STAND
 
     def test_velocity_keys_not_in_base_mapping(self):
         """Base keyboard mapping should NOT include velocity keys."""
@@ -199,30 +199,30 @@ class TestKeyboardListener:
         assert p._keyboard_listener._started is True
 
 
-class TestKeyboardOtherInput:
+class TestKeyboardStateCommandProvider:
     def _make_provider(self, mapping=None):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardOtherInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardStateCommandProvider
 
         queue = deque()
-        prov = KeyboardOtherInput(mapping or KEYBOARD_BASE, queue)
+        prov = KeyboardStateCommandProvider(mapping or KEYBOARD_BASE, queue)
         return prov
 
     def test_poll_returns_mapped_commands(self):
         prov = self._make_provider()
         prov._queue.extend(["]", "o", "i"])
         commands = prov.poll()
-        assert commands == [Command.START, Command.STOP, Command.INIT]
+        assert commands == [StateCommand.START, StateCommand.STOP, StateCommand.INIT]
 
     def test_poll_skips_unmapped_keys(self):
         prov = self._make_provider()
         prov._queue.extend(["x", "unknown", "]"])
         commands = prov.poll()
-        assert commands == [Command.START]
+        assert commands == [StateCommand.START]
 
     def test_poll_drains_queue(self):
         prov = self._make_provider()
         prov._queue.append("]")
-        assert prov.poll() == [Command.START]
+        assert prov.poll() == [StateCommand.START]
         assert prov.poll() == []  # second poll is empty
 
     def test_poll_kp_commands(self):
@@ -230,18 +230,18 @@ class TestKeyboardOtherInput:
         prov._queue.extend(["v", "b", "f", "g", "r"])
         commands = prov.poll()
         assert commands == [
-            Command.KP_DOWN_FINE,
-            Command.KP_UP_FINE,
-            Command.KP_DOWN,
-            Command.KP_UP,
-            Command.KP_RESET,
+            StateCommand.KP_DOWN_FINE,
+            StateCommand.KP_UP_FINE,
+            StateCommand.KP_DOWN,
+            StateCommand.KP_UP,
+            StateCommand.KP_RESET,
         ]
 
     def test_poll_switch_policy(self):
         prov = self._make_provider()
         prov._queue.append("2")
         commands = prov.poll()
-        assert commands == [Command.SWITCH_POLICY_2]
+        assert commands == [StateCommand.SWITCH_POLICY_2]
 
     def test_poll_empty_queue_returns_empty(self):
         prov = self._make_provider()
@@ -252,28 +252,28 @@ class TestKeyboardOtherInput:
         prov._queue.extend(["=", "]", "w", "q"])
         commands = prov.poll()
         assert commands == [
-            LocomotionCommand.STAND_TOGGLE,
-            Command.START,
-            LocomotionCommand.VEL_FORWARD,
-            LocomotionCommand.ANG_VEL_LEFT,
+            StateCommand.STAND_TOGGLE,
+            StateCommand.START,
+            StateCommand.VEL_FORWARD,
+            StateCommand.ANG_VEL_LEFT,
         ]
 
     def test_wbt_mapping(self):
         prov = self._make_provider(KEYBOARD_WBT)
         prov._queue.extend(["s", "o"])
         commands = prov.poll()
-        assert commands == [WbtCommand.START_MOTION_CLIP, Command.STOP]
+        assert commands == [StateCommand.START_MOTION_CLIP, StateCommand.STOP]
 
     def test_shared_queue_between_instances(self):
-        """Two KeyboardOtherInput instances sharing a queue: one drains, other sees empty."""
-        from holosoma_inference.inputs.impl.keyboard import KeyboardOtherInput
+        """Two KeyboardStateCommandProvider instances sharing a queue: one drains, other sees empty."""
+        from holosoma_inference.inputs.impl.keyboard import KeyboardStateCommandProvider
 
         shared_queue = deque()
-        prov1 = KeyboardOtherInput(KEYBOARD_BASE, shared_queue)
-        prov2 = KeyboardOtherInput(KEYBOARD_BASE, shared_queue)
+        prov1 = KeyboardStateCommandProvider(KEYBOARD_BASE, shared_queue)
+        prov2 = KeyboardStateCommandProvider(KEYBOARD_BASE, shared_queue)
 
         shared_queue.append("]")
-        assert prov1.poll() == [Command.START]
+        assert prov1.poll() == [StateCommand.START]
         assert prov2.poll() == []  # already drained
 
 
@@ -325,44 +325,44 @@ class TestJoystickVelocityInput:
         assert prov.key_states == {"A": True}
 
 
-class TestJoystickOtherInput:
+class TestJoystickStateCommandProvider:
     def test_poll_multiple_rising_edges(self, policy):
         """Multiple buttons pressed simultaneously produce multiple commands."""
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
 
         vel = JoystickVelocityInput(policy)
         vel.key_states = {"A": True, "B": True, "Y": True}
         vel.last_key_states = {"A": False, "B": False, "Y": False}
 
-        prov = JoystickOtherInput(policy, JOYSTICK_BASE)
+        prov = JoystickStateCommandProvider(policy, JOYSTICK_BASE)
         prov._shared_velocity = vel
         commands = prov.poll()
 
-        assert set(commands) == {Command.START, Command.STOP, Command.INIT}
+        assert set(commands) == {StateCommand.START, StateCommand.STOP, StateCommand.INIT}
 
     def test_poll_shared_edge_detection(self, policy):
         """When shared with velocity provider, returns commands for rising edges."""
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
 
         vel = JoystickVelocityInput(policy)
         vel.key_states = {"A": True}
         vel.last_key_states = {"A": False}
 
-        prov = JoystickOtherInput(policy, JOYSTICK_BASE)
+        prov = JoystickStateCommandProvider(policy, JOYSTICK_BASE)
         prov._shared_velocity = vel
         commands = prov.poll()
 
-        assert commands == [Command.START]
+        assert commands == [StateCommand.START]
 
     def test_poll_shared_no_dispatch_on_hold(self, policy):
         """No commands when button was already held."""
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
 
         vel = JoystickVelocityInput(policy)
         vel.key_states = {"A": True}
         vel.last_key_states = {"A": True}
 
-        prov = JoystickOtherInput(policy, JOYSTICK_BASE)
+        prov = JoystickStateCommandProvider(policy, JOYSTICK_BASE)
         prov._shared_velocity = vel
         commands = prov.poll()
 
@@ -370,33 +370,33 @@ class TestJoystickOtherInput:
 
     def test_poll_standalone_reads_buttons(self, policy):
         """When not shared, reads buttons directly from SDK."""
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider
 
         policy.interface.get_joystick_msg.return_value = "msg"
         policy.interface.get_joystick_key.return_value = "B"
 
-        prov = JoystickOtherInput(policy, JOYSTICK_BASE)
+        prov = JoystickStateCommandProvider(policy, JOYSTICK_BASE)
         commands = prov.poll()  # First poll: B goes True (rising edge)
 
-        assert commands == [Command.STOP]
+        assert commands == [StateCommand.STOP]
 
     def test_poll_standalone_skips_when_no_msg(self, policy):
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider
 
         policy.interface.get_joystick_msg.return_value = None
-        prov = JoystickOtherInput(policy, JOYSTICK_BASE)
+        prov = JoystickStateCommandProvider(policy, JOYSTICK_BASE)
         commands = prov.poll()
         assert commands == []
 
     def test_unmapped_button_not_in_commands(self, policy):
         """Buttons not in the mapping are silently ignored."""
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
 
         vel = JoystickVelocityInput(policy)
         vel.key_states = {"UNKNOWN": True}
         vel.last_key_states = {"UNKNOWN": False}
 
-        prov = JoystickOtherInput(policy, JOYSTICK_BASE)
+        prov = JoystickStateCommandProvider(policy, JOYSTICK_BASE)
         prov._shared_velocity = vel
         commands = prov.poll()
 
@@ -442,51 +442,51 @@ class TestRos2VelocityInput:
         assert policy.ang_vel_command[0, 0] == 1.0
 
 
-class TestRos2OtherInput:
+class TestRos2StateCommandProvider:
     def test_known_commands_queued(self, policy):
-        from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2OtherInput(policy)
+        prov = Ros2StateCommandProvider(policy)
         prov._callback(SimpleNamespace(data="start"))
         prov._callback(SimpleNamespace(data="stop"))
         prov._callback(SimpleNamespace(data="init"))
 
         commands = prov.poll()
-        assert commands == [Command.START, Command.STOP, Command.INIT]
+        assert commands == [StateCommand.START, StateCommand.STOP, StateCommand.INIT]
 
     def test_walk_stand_commands(self, policy):
-        from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2OtherInput(policy)
+        prov = Ros2StateCommandProvider(policy)
         prov._callback(SimpleNamespace(data="walk"))
         prov._callback(SimpleNamespace(data="stand"))
 
         commands = prov.poll()
-        assert commands == [LocomotionCommand.WALK, LocomotionCommand.STAND]
+        assert commands == [StateCommand.WALK, StateCommand.STAND]
 
     def test_unknown_command_warns(self, policy):
-        from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2OtherInput(policy)
+        prov = Ros2StateCommandProvider(policy)
         prov._callback(SimpleNamespace(data="bogus"))
         policy.logger.warning.assert_called_once()
         assert prov.poll() == []
 
     def test_whitespace_and_case_normalization(self, policy):
-        from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2OtherInput(policy)
+        prov = Ros2StateCommandProvider(policy)
         prov._callback(SimpleNamespace(data="  WALK  "))
 
         commands = prov.poll()
-        assert commands == [LocomotionCommand.WALK]
+        assert commands == [StateCommand.WALK]
 
     def test_poll_drains_queue(self, policy):
-        from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2OtherInput(policy)
+        prov = Ros2StateCommandProvider(policy)
         prov._callback(SimpleNamespace(data="start"))
-        assert prov.poll() == [Command.START]
+        assert prov.poll() == [StateCommand.START]
         assert prov.poll() == []  # second poll is empty
 
 
@@ -513,7 +513,7 @@ _skip_policies = pytest.mark.skipif(not _has_policies, reason="Policy deps not i
 
 @_skip_policies
 class TestBasePolicyFactory:
-    """Test BasePolicy._create_velocity_input and _create_other_input."""
+    """Test BasePolicy._create_velocity_input and _create_command_provider."""
 
     def _make_base(self, monkeypatch=None):
         from holosoma_inference.policies.base import BasePolicy
@@ -547,35 +547,35 @@ class TestBasePolicyFactory:
         assert isinstance(result, Ros2VelocityInput)
 
     def test_keyboard_other(self, monkeypatch):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardOtherInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardStateCommandProvider
 
         bp = self._make_base(monkeypatch)
-        result = bp._create_other_input(InputSource.keyboard)
-        assert isinstance(result, KeyboardOtherInput)
+        result = bp._create_command_provider(InputSource.keyboard)
+        assert isinstance(result, KeyboardStateCommandProvider)
         assert result._mapping is KEYBOARD_BASE
         assert result._queue is bp._keyboard_listener._queue
 
     def test_joystick_other(self):
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider
 
         bp = self._make_base()
-        result = bp._create_other_input(InputSource.joystick)
-        assert isinstance(result, JoystickOtherInput)
+        result = bp._create_command_provider(InputSource.joystick)
+        assert isinstance(result, JoystickStateCommandProvider)
         assert result._mapping is JOYSTICK_BASE
 
     def test_ros2_other(self):
-        from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
         bp = self._make_base()
-        result = bp._create_other_input(InputSource.ros2)
-        assert isinstance(result, Ros2OtherInput)
+        result = bp._create_command_provider(InputSource.ros2)
+        assert isinstance(result, Ros2StateCommandProvider)
 
     def test_unknown_source_raises(self, monkeypatch):
         bp = self._make_base(monkeypatch)
         with pytest.raises(ValueError, match="Unknown velocity"):
             bp._create_velocity_input("invalid")
-        with pytest.raises(ValueError, match="Unknown other"):
-            bp._create_other_input("invalid")
+        with pytest.raises(ValueError, match="Unknown command provider"):
+            bp._create_command_provider("invalid")
 
 
 @_skip_policies
@@ -600,19 +600,19 @@ class TestLocomotionPolicyFactory:
         assert type(result) is KeyboardVelocityInput
 
     def test_keyboard_other_uses_locomotion_mapping(self, monkeypatch):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardOtherInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardStateCommandProvider
 
         lp = self._make_loco(monkeypatch)
-        result = lp._create_other_input(InputSource.keyboard)
-        assert isinstance(result, KeyboardOtherInput)
+        result = lp._create_command_provider(InputSource.keyboard)
+        assert isinstance(result, KeyboardStateCommandProvider)
         assert result._mapping is KEYBOARD_LOCOMOTION
 
     def test_joystick_other_uses_locomotion_mapping(self):
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider
 
         lp = self._make_loco()
-        result = lp._create_other_input(InputSource.joystick)
-        assert isinstance(result, JoystickOtherInput)
+        result = lp._create_command_provider(InputSource.joystick)
+        assert isinstance(result, JoystickStateCommandProvider)
         assert result._mapping is JOYSTICK_LOCOMOTION
 
     def test_joystick_velocity_falls_to_base(self):
@@ -623,11 +623,11 @@ class TestLocomotionPolicyFactory:
         assert type(result) is JoystickVelocityInput
 
     def test_ros2_falls_to_base(self):
-        from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput, Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider, Ros2VelocityInput
 
         lp = self._make_loco()
         assert isinstance(lp._create_velocity_input(InputSource.ros2), Ros2VelocityInput)
-        assert isinstance(lp._create_other_input(InputSource.ros2), Ros2OtherInput)
+        assert isinstance(lp._create_command_provider(InputSource.ros2), Ros2StateCommandProvider)
 
 
 @_skip_policies
@@ -644,19 +644,19 @@ class TestWbtPolicyFactory:
         return wp
 
     def test_keyboard_other_uses_wbt_mapping(self, monkeypatch):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardOtherInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardStateCommandProvider
 
         wp = self._make_wbt(monkeypatch)
-        result = wp._create_other_input(InputSource.keyboard)
-        assert isinstance(result, KeyboardOtherInput)
+        result = wp._create_command_provider(InputSource.keyboard)
+        assert isinstance(result, KeyboardStateCommandProvider)
         assert result._mapping is KEYBOARD_WBT
 
     def test_joystick_other_uses_wbt_mapping(self):
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider
 
         wp = self._make_wbt()
-        result = wp._create_other_input(InputSource.joystick)
-        assert isinstance(result, JoystickOtherInput)
+        result = wp._create_command_provider(InputSource.joystick)
+        assert isinstance(result, JoystickStateCommandProvider)
         assert result._mapping is JOYSTICK_WBT
 
     def test_keyboard_velocity_falls_to_base(self):
@@ -667,11 +667,11 @@ class TestWbtPolicyFactory:
         assert type(result) is KeyboardVelocityInput
 
     def test_ros2_falls_to_base(self):
-        from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput, Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider, Ros2VelocityInput
 
         wp = self._make_wbt()
         assert isinstance(wp._create_velocity_input(InputSource.ros2), Ros2VelocityInput)
-        assert isinstance(wp._create_other_input(InputSource.ros2), Ros2OtherInput)
+        assert isinstance(wp._create_command_provider(InputSource.ros2), Ros2StateCommandProvider)
 
 
 # ============================================================================
@@ -694,7 +694,7 @@ _skip_dual_mode = pytest.mark.skipif(not _has_dual_mode, reason="DualMode deps n
 
 def _make_dual():
     """Build a DualModePolicy with mock policies, skipping __init__."""
-    from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
+    from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider
     from holosoma_inference.policies.dual_mode import DualModePolicy
 
     dual = object.__new__(DualModePolicy)
@@ -706,9 +706,9 @@ def _make_dual():
     dual.primary._velocity_input = MagicMock()
     dual.secondary._velocity_input = MagicMock()
 
-    # Give both policies real JoystickOtherInput with base mappings
-    dual.primary._other_input = JoystickOtherInput(dual.primary, dict(JOYSTICK_BASE))
-    dual.secondary._other_input = JoystickOtherInput(dual.secondary, dict(JOYSTICK_BASE))
+    # Give both policies real JoystickStateCommandProvider with base mappings
+    dual.primary._command_provider = JoystickStateCommandProvider(dual.primary, dict(JOYSTICK_BASE))
+    dual.secondary._command_provider = JoystickStateCommandProvider(dual.secondary, dict(JOYSTICK_BASE))
 
     dual.primary._dispatch_command = MagicMock()
     dual.secondary._dispatch_command = MagicMock()
@@ -721,40 +721,40 @@ def _make_dual():
 class TestDualModeSwitching:
     def test_switch_mode_injected_in_mappings(self):
         dual = _make_dual()
-        assert dual.primary._other_input._mapping["X"] == DualModeCommand.SWITCH_MODE
-        assert dual.primary._other_input._mapping["x"] == DualModeCommand.SWITCH_MODE
-        assert dual.secondary._other_input._mapping["X"] == DualModeCommand.SWITCH_MODE
+        assert dual.primary._command_provider._mapping["X"] == StateCommand.SWITCH_MODE
+        assert dual.primary._command_provider._mapping["x"] == StateCommand.SWITCH_MODE
+        assert dual.secondary._command_provider._mapping["X"] == StateCommand.SWITCH_MODE
 
     def test_x_joystick_triggers_switch(self):
         dual = _make_dual()
         assert dual.active is dual.primary
-        dual.primary._dispatch_command(DualModeCommand.SWITCH_MODE)
+        dual.primary._dispatch_command(StateCommand.SWITCH_MODE)
         assert dual.active is dual.secondary
 
     def test_double_switch_returns_to_primary(self):
         dual = _make_dual()
-        dual.primary._dispatch_command(DualModeCommand.SWITCH_MODE)
+        dual.primary._dispatch_command(StateCommand.SWITCH_MODE)
         assert dual.active is dual.secondary
-        dual.secondary._dispatch_command(DualModeCommand.SWITCH_MODE)
+        dual.secondary._dispatch_command(StateCommand.SWITCH_MODE)
         assert dual.active is dual.primary
         assert dual.active_label == "primary"
 
     def test_non_switch_command_delegates_to_active(self):
         dual = _make_dual()
         orig_dispatch = dual._orig_dispatch[id(dual.primary)]
-        dual.primary._dispatch_command(Command.START)
-        orig_dispatch.assert_called_once_with(Command.START)
+        dual.primary._dispatch_command(StateCommand.START)
+        orig_dispatch.assert_called_once_with(StateCommand.START)
 
     def test_delegates_to_secondary_after_switch(self):
         dual = _make_dual()
-        dual.primary._dispatch_command(DualModeCommand.SWITCH_MODE)  # switch to secondary
+        dual.primary._dispatch_command(StateCommand.SWITCH_MODE)  # switch to secondary
         orig_secondary = dual._orig_dispatch[id(dual.secondary)]
-        dual.secondary._dispatch_command(Command.START)
-        orig_secondary.assert_called_once_with(Command.START)
+        dual.secondary._dispatch_command(StateCommand.START)
+        orig_secondary.assert_called_once_with(StateCommand.START)
 
     def test_switch_stops_old_and_starts_new(self):
         dual = _make_dual()
-        dual.primary._dispatch_command(DualModeCommand.SWITCH_MODE)
+        dual.primary._dispatch_command(StateCommand.SWITCH_MODE)
         dual.primary._handle_stop_policy.assert_called_once()
         dual.secondary._resolve_control_gains.assert_called_once()
         dual.secondary._init_phase_components.assert_called_once()
@@ -772,7 +772,7 @@ class TestDualModeSwitching:
         dual.primary._velocity_input = pri_vel
         dual.secondary._velocity_input = sec_vel
 
-        dual.primary._dispatch_command(DualModeCommand.SWITCH_MODE)
+        dual.primary._dispatch_command(StateCommand.SWITCH_MODE)
 
         assert sec_vel.key_states == {"X": True, "A": False}
         assert sec_vel.last_key_states == {"X": True, "A": False}
@@ -783,8 +783,8 @@ class TestDualModeKeyboardQueueWiring:
     """Test that both policies share the same keyboard queue via DI."""
 
     def test_shared_queue_via_factory(self):
-        """Both policies' KeyboardOtherInput share the same listener queue."""
-        from holosoma_inference.inputs.impl.keyboard import KeyboardListener, KeyboardOtherInput
+        """Both policies' KeyboardStateCommandProvider share the same listener queue."""
+        from holosoma_inference.inputs.impl.keyboard import KeyboardListener, KeyboardStateCommandProvider
         from holosoma_inference.policies.dual_mode import DualModePolicy
 
         dual = object.__new__(DualModePolicy)
@@ -800,8 +800,8 @@ class TestDualModeKeyboardQueueWiring:
         listener = KeyboardListener(dual.primary)
         shared_queue = listener._queue
         dual.primary._keyboard_listener = listener
-        dual.primary._other_input = KeyboardOtherInput(dict(KEYBOARD_BASE), shared_queue)
-        dual.secondary._other_input = KeyboardOtherInput(dict(KEYBOARD_BASE), shared_queue)
+        dual.primary._command_provider = KeyboardStateCommandProvider(dict(KEYBOARD_BASE), shared_queue)
+        dual.secondary._command_provider = KeyboardStateCommandProvider(dict(KEYBOARD_BASE), shared_queue)
 
         dual.primary._dispatch_command = MagicMock()
         dual.secondary._dispatch_command = MagicMock()
@@ -809,10 +809,10 @@ class TestDualModeKeyboardQueueWiring:
         dual._setup_command_intercept()
 
         # Both share the same queue
-        assert dual.primary._other_input._queue is dual.secondary._other_input._queue
+        assert dual.primary._command_provider._queue is dual.secondary._command_provider._queue
 
     def test_keyboard_commands_reach_active_via_poll(self):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardListener, KeyboardOtherInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardListener, KeyboardStateCommandProvider
         from holosoma_inference.policies.dual_mode import DualModePolicy
 
         dual = object.__new__(DualModePolicy)
@@ -827,8 +827,8 @@ class TestDualModeKeyboardQueueWiring:
         listener = KeyboardListener(dual.primary)
         shared_queue = listener._queue
         dual.primary._keyboard_listener = listener
-        dual.primary._other_input = KeyboardOtherInput(dict(KEYBOARD_BASE), shared_queue)
-        dual.secondary._other_input = KeyboardOtherInput(dict(KEYBOARD_BASE), shared_queue)
+        dual.primary._command_provider = KeyboardStateCommandProvider(dict(KEYBOARD_BASE), shared_queue)
+        dual.secondary._command_provider = KeyboardStateCommandProvider(dict(KEYBOARD_BASE), shared_queue)
 
         dual.primary._dispatch_command = MagicMock()
         dual.secondary._dispatch_command = MagicMock()
@@ -839,11 +839,11 @@ class TestDualModeKeyboardQueueWiring:
         listener._queue.append("]")
 
         # Active policy (primary) drains the queue
-        commands = dual.active._other_input.poll()
-        assert commands == [Command.START]
+        commands = dual.active._command_provider.poll()
+        assert commands == [StateCommand.START]
 
         # Queue is now empty
-        assert dual.active._other_input.poll() == []
+        assert dual.active._command_provider.poll() == []
 
 
 # ============================================================================
@@ -853,9 +853,9 @@ class TestDualModeKeyboardQueueWiring:
 
 class TestSharedJoystickWiring:
     def test_shared_velocity_none_by_default(self, policy):
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider
 
-        other = JoystickOtherInput(policy, JOYSTICK_BASE)
+        other = JoystickStateCommandProvider(policy, JOYSTICK_BASE)
         assert other._shared_velocity is None
 
 
@@ -874,22 +874,22 @@ class TestChannelSeparation:
 
     def test_velocity_keys_in_locomotion_keyboard_mapping(self):
         """LocomotionPolicy keyboard mapping includes velocity keys as command enums."""
-        assert KEYBOARD_LOCOMOTION["w"] == LocomotionCommand.VEL_FORWARD
-        assert KEYBOARD_LOCOMOTION["a"] == LocomotionCommand.VEL_LEFT
-        assert KEYBOARD_LOCOMOTION["d"] == LocomotionCommand.VEL_RIGHT
-        assert KEYBOARD_LOCOMOTION["q"] == LocomotionCommand.ANG_VEL_LEFT
-        assert KEYBOARD_LOCOMOTION["e"] == LocomotionCommand.ANG_VEL_RIGHT
-        assert KEYBOARD_LOCOMOTION["z"] == LocomotionCommand.ZERO_VELOCITY
+        assert KEYBOARD_LOCOMOTION["w"] == StateCommand.VEL_FORWARD
+        assert KEYBOARD_LOCOMOTION["a"] == StateCommand.VEL_LEFT
+        assert KEYBOARD_LOCOMOTION["d"] == StateCommand.VEL_RIGHT
+        assert KEYBOARD_LOCOMOTION["q"] == StateCommand.ANG_VEL_LEFT
+        assert KEYBOARD_LOCOMOTION["e"] == StateCommand.ANG_VEL_RIGHT
+        assert KEYBOARD_LOCOMOTION["z"] == StateCommand.ZERO_VELOCITY
 
     def test_joystick_other_ignores_unmapped_buttons(self, policy):
-        """JoystickOtherInput only returns commands for mapped buttons."""
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput, JoystickVelocityInput
+        """JoystickStateCommandProvider only returns commands for mapped buttons."""
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
 
         vel = JoystickVelocityInput(policy)
         vel.key_states = {"unknown_stick": True}
         vel.last_key_states = {"unknown_stick": False}
 
-        prov = JoystickOtherInput(policy, JOYSTICK_BASE)
+        prov = JoystickStateCommandProvider(policy, JOYSTICK_BASE)
         prov._shared_velocity = vel
         assert prov.poll() == []
 
@@ -947,12 +947,12 @@ class TestRos2VelocityEdgeCases:
         assert policy.ang_vel_command[0, 0] == 0.0
 
 
-class TestRos2OtherInputEdgeCases:
+class TestRos2StateCommandProviderEdgeCases:
     def test_empty_string_warns(self, policy):
         """Empty/whitespace-only input is treated as unknown command."""
-        from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2OtherInput(policy)
+        prov = Ros2StateCommandProvider(policy)
         prov._callback(SimpleNamespace(data="   "))
         policy.logger.warning.assert_called_once()
         assert prov.poll() == []
@@ -961,12 +961,12 @@ class TestRos2OtherInputEdgeCases:
 class TestJoystickStandaloneEdgeCases:
     def test_poll_standalone_button_release_clears_states(self, policy):
         """When no button is pressed, all key states go False."""
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider
 
         policy.interface.get_joystick_msg.return_value = "msg"
         # First poll: press B
         policy.interface.get_joystick_key.return_value = "B"
-        prov = JoystickOtherInput(policy, JOYSTICK_BASE)
+        prov = JoystickStateCommandProvider(policy, JOYSTICK_BASE)
         prov.poll()  # rising edge on B
 
         # Second poll: no button pressed
@@ -978,14 +978,14 @@ class TestJoystickStandaloneEdgeCases:
 
     def test_poll_standalone_repeated_same_button_no_duplicate(self, policy):
         """Holding a button across polls should not re-fire the command."""
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider
 
         policy.interface.get_joystick_msg.return_value = "msg"
         policy.interface.get_joystick_key.return_value = "A"
 
-        prov = JoystickOtherInput(policy, JOYSTICK_BASE)
+        prov = JoystickStateCommandProvider(policy, JOYSTICK_BASE)
         first = prov.poll()
-        assert first == [Command.START]  # rising edge
+        assert first == [StateCommand.START]  # rising edge
 
         second = prov.poll()
         assert second == []  # held, no rising edge

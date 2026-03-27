@@ -80,12 +80,12 @@ class DualModePolicy:
         via ``_get_keyboard_queue()`` + ``_shared_hardware_source``.
         Only ``_dispatch_command`` needs patching to intercept SWITCH_MODE.
         """
-        from holosoma_inference.inputs.api.commands import DualModeCommand
+        from holosoma_inference.inputs.api.commands import StateCommand
 
         # Inject the switch-mode key into both policies' other_input mappings
         for p in (self.primary, self.secondary):
-            p._other_input._mapping["X"] = DualModeCommand.SWITCH_MODE
-            p._other_input._mapping["x"] = DualModeCommand.SWITCH_MODE
+            p._command_provider._mapping["X"] = StateCommand.SWITCH_MODE
+            p._command_provider._mapping["x"] = StateCommand.SWITCH_MODE
 
         # Patch _dispatch_command to intercept SWITCH_MODE
         self._orig_dispatch = {
@@ -94,7 +94,7 @@ class DualModePolicy:
         }
 
         def patched_dispatch(cmd):
-            if cmd == DualModeCommand.SWITCH_MODE:
+            if cmd == StateCommand.SWITCH_MODE:
                 self._handle_mode_switch()
             else:
                 self._orig_dispatch[id(self.active)](cmd)
@@ -144,7 +144,7 @@ class DualModePolicy:
                 self.active.latency_tracker.start_cycle()
 
                 self.active._velocity_input.poll()
-                for cmd in self.active._other_input.poll():
+                for cmd in self.active._command_provider.poll():
                     self.active._dispatch_command(cmd)
                     self.active._print_control_status()
                 if self.active.use_phase:

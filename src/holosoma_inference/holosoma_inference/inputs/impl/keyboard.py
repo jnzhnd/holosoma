@@ -9,45 +9,43 @@ from typing import TYPE_CHECKING
 
 from sshkeyboard import listen_keyboard
 
-from holosoma_inference.inputs.api.base import OtherInput, VelocityInput
-from holosoma_inference.inputs.api.commands import Command, LocomotionCommand, WbtCommand
+from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
+from holosoma_inference.inputs.api.commands import StateCommand
 
 if TYPE_CHECKING:
-    from enum import Enum
-
     from holosoma_inference.policies.base import BasePolicy
 
 # ---------------------------------------------------------------------------
 # Keyboard mappings
 # ---------------------------------------------------------------------------
 
-KEYBOARD_BASE: dict[str, Enum] = {
-    "]": Command.START,
-    "o": Command.STOP,
-    "i": Command.INIT,
-    "v": Command.KP_DOWN_FINE,
-    "b": Command.KP_UP_FINE,
-    "f": Command.KP_DOWN,
-    "g": Command.KP_UP,
-    "r": Command.KP_RESET,
-    **{str(n): Command[f"SWITCH_POLICY_{n}"] for n in range(1, 10)},
+KEYBOARD_BASE: dict[str, StateCommand] = {
+    "]": StateCommand.START,
+    "o": StateCommand.STOP,
+    "i": StateCommand.INIT,
+    "v": StateCommand.KP_DOWN_FINE,
+    "b": StateCommand.KP_UP_FINE,
+    "f": StateCommand.KP_DOWN,
+    "g": StateCommand.KP_UP,
+    "r": StateCommand.KP_RESET,
+    **{str(n): StateCommand[f"SWITCH_POLICY_{n}"] for n in range(1, 10)},
 }
 
-KEYBOARD_LOCOMOTION: dict[str, Enum] = {
+KEYBOARD_LOCOMOTION: dict[str, StateCommand] = {
     **KEYBOARD_BASE,
-    "=": LocomotionCommand.STAND_TOGGLE,
-    "z": LocomotionCommand.ZERO_VELOCITY,
-    "w": LocomotionCommand.VEL_FORWARD,
-    "s": LocomotionCommand.VEL_BACKWARD,
-    "a": LocomotionCommand.VEL_LEFT,
-    "d": LocomotionCommand.VEL_RIGHT,
-    "q": LocomotionCommand.ANG_VEL_LEFT,
-    "e": LocomotionCommand.ANG_VEL_RIGHT,
+    "=": StateCommand.STAND_TOGGLE,
+    "z": StateCommand.ZERO_VELOCITY,
+    "w": StateCommand.VEL_FORWARD,
+    "s": StateCommand.VEL_BACKWARD,
+    "a": StateCommand.VEL_LEFT,
+    "d": StateCommand.VEL_RIGHT,
+    "q": StateCommand.ANG_VEL_LEFT,
+    "e": StateCommand.ANG_VEL_RIGHT,
 }
 
-KEYBOARD_WBT: dict[str, Enum] = {
+KEYBOARD_WBT: dict[str, StateCommand] = {
     **KEYBOARD_BASE,
-    "s": WbtCommand.START_MOTION_CLIP,
+    "s": StateCommand.START_MOTION_CLIP,
 }
 
 
@@ -57,7 +55,7 @@ class KeyboardListener:
     Created lazily by keyboard providers and stored on the policy as
     ``_keyboard_listener``.  Multiple providers share one instance;
     ``start()`` is idempotent.  Keypresses are queued for the main loop
-    to drain via ``KeyboardOtherInput.poll()``.
+    to drain via ``KeyboardStateCommandProvider.poll()``.
     """
 
     def __init__(self, policy: BasePolicy) -> None:
@@ -113,8 +111,8 @@ def _ensure_keyboard_listener(policy: BasePolicy) -> None:
 class KeyboardVelocityInput(VelocityInput):
     """No-op keyboard velocity input.
 
-    Velocity for keyboard is handled via command enums in the OtherInput
-    mapping (e.g. LocomotionCommand.VEL_FORWARD for the 'w' key).
+    Velocity for keyboard is handled via command enums in the
+    StateCommandProvider mapping (e.g. StateCommand.VEL_FORWARD for the 'w' key).
     This class exists only to start the shared keyboard listener.
     """
 
@@ -122,7 +120,7 @@ class KeyboardVelocityInput(VelocityInput):
         _ensure_keyboard_listener(self.policy)
 
 
-class KeyboardOtherInput(OtherInput):
+class KeyboardStateCommandProvider(StateCommandProvider):
     """Keyboard handler for discrete commands using a mapping dict.
 
     The shared ``KeyboardListener`` queues raw keycodes.  ``poll()`` drains
@@ -130,12 +128,12 @@ class KeyboardOtherInput(OtherInput):
     resulting command enums — same pull pattern as joystick.
     """
 
-    def __init__(self, mapping: dict[str, Enum], queue: deque[str]) -> None:
+    def __init__(self, mapping: dict[str, StateCommand], queue: deque[str]) -> None:
         super().__init__(mapping)
         self._queue = queue
 
-    def poll(self) -> list:
-        commands = []
+    def poll(self) -> list[StateCommand]:
+        commands: list[StateCommand] = []
         while True:
             try:
                 keycode = self._queue.popleft()

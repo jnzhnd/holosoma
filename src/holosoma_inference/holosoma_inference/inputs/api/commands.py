@@ -1,4 +1,4 @@
-"""Command enums for input providers.
+"""State command enum for input providers.
 
 Commands represent user *intent* (e.g. "start the policy") decoupled from the
 physical input that triggered it (e.g. the A button on a joystick, or the ]
@@ -14,9 +14,10 @@ from __future__ import annotations
 from enum import Enum, auto
 
 
-class Command(Enum):
-    """Commands shared across all policy types."""
+class StateCommand(Enum):
+    """All commands dispatched through the input system."""
 
+    # --- Common ---
     START = auto()
     STOP = auto()
     INIT = auto()
@@ -37,10 +38,7 @@ class Command(Enum):
     SWITCH_POLICY_8 = auto()
     SWITCH_POLICY_9 = auto()
 
-
-class LocomotionCommand(Enum):
-    """Locomotion-specific commands."""
-
+    # --- Locomotion ---
     STAND_TOGGLE = auto()
     ZERO_VELOCITY = auto()
     WALK = auto()
@@ -52,18 +50,12 @@ class LocomotionCommand(Enum):
     ANG_VEL_LEFT = auto()
     ANG_VEL_RIGHT = auto()
 
-
-class WbtCommand(Enum):
-    """Whole-body tracking specific commands."""
-
+    # --- Whole-body tracking ---
     START_MOTION_CLIP = auto()
 
-
-class DualModeCommand(Enum):
-    """Dual-mode policy switching."""
-
+    # --- Dual mode ---
     SWITCH_MODE = auto()
 
 
 # Maps SWITCH_POLICY_N commands to 0-based policy indices.
-SWITCH_POLICY_INDEX: dict[Command, int] = {Command[f"SWITCH_POLICY_{n}"]: n - 1 for n in range(1, 10)}
+SWITCH_POLICY_INDEX: dict[StateCommand, int] = {StateCommand[f"SWITCH_POLICY_{n}"]: n - 1 for n in range(1, 10)}

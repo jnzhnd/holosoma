@@ -1,6 +1,7 @@
 import numpy as np
 from termcolor import colored
 
+from holosoma_inference.inputs.api.commands import StateCommand
 from holosoma_inference.inputs.impl.joystick import JOYSTICK_LOCOMOTION
 from holosoma_inference.inputs.impl.keyboard import KEYBOARD_LOCOMOTION
 
@@ -52,34 +53,32 @@ class LocomotionPolicy(BasePolicy):
             self.is_standing = False
 
     def _dispatch_command(self, cmd):
-        from holosoma_inference.inputs.api.commands import LocomotionCommand
-
-        if cmd == LocomotionCommand.STAND_TOGGLE:
+        if cmd == StateCommand.STAND_TOGGLE:
             self._handle_stand_command()
-        elif cmd == LocomotionCommand.ZERO_VELOCITY:
+        elif cmd == StateCommand.ZERO_VELOCITY:
             self._handle_zero_velocity()
-        elif cmd == LocomotionCommand.WALK:
+        elif cmd == StateCommand.WALK:
             self.stand_command[0, 0] = 1
             self.base_height_command[0, 0] = self.desired_base_height
             self.logger.info("ROS2 command: walk")
-        elif cmd == LocomotionCommand.STAND:
+        elif cmd == StateCommand.STAND:
             self.stand_command[0, 0] = 0
             self.logger.info("ROS2 command: stand")
-        elif cmd == LocomotionCommand.VEL_FORWARD:
+        elif cmd == StateCommand.VEL_FORWARD:
             if self.stand_command[0, 0]:
                 self.lin_vel_command[0, 0] += 0.1
-        elif cmd == LocomotionCommand.VEL_BACKWARD:
+        elif cmd == StateCommand.VEL_BACKWARD:
             if self.stand_command[0, 0]:
                 self.lin_vel_command[0, 0] -= 0.1
-        elif cmd == LocomotionCommand.VEL_LEFT:
+        elif cmd == StateCommand.VEL_LEFT:
             if self.stand_command[0, 0]:
                 self.lin_vel_command[0, 1] += 0.1
-        elif cmd == LocomotionCommand.VEL_RIGHT:
+        elif cmd == StateCommand.VEL_RIGHT:
             if self.stand_command[0, 0]:
                 self.lin_vel_command[0, 1] -= 0.1
-        elif cmd == LocomotionCommand.ANG_VEL_LEFT:
+        elif cmd == StateCommand.ANG_VEL_LEFT:
             self.ang_vel_command[0, 0] -= 0.1
-        elif cmd == LocomotionCommand.ANG_VEL_RIGHT:
+        elif cmd == StateCommand.ANG_VEL_RIGHT:
             self.ang_vel_command[0, 0] += 0.1
         else:
             super()._dispatch_command(cmd)

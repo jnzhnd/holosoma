@@ -350,7 +350,7 @@ class BasePolicy:
         """Create and start input providers based on config.
 
         Called after hardware init. Subclasses override _create_velocity_input
-        and _create_other_input for policy-specific provider variants.
+        and _create_command_provider for policy-specific provider variants.
         """
         vel = self.config.task.velocity_input
         other = self.config.task.other_input
@@ -363,18 +363,18 @@ class BasePolicy:
                 other = InputSource.keyboard
 
         self._velocity_input = self._create_velocity_input(vel)
-        self._other_input = self._create_other_input(other)
+        self._command_provider = self._create_command_provider(other)
 
         # Wire shared joystick state when both channels use joystick
-        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
 
-        if isinstance(self._other_input, JoystickOtherInput) and isinstance(
+        if isinstance(self._command_provider, JoystickStateCommandProvider) and isinstance(
             self._velocity_input, JoystickVelocityInput
         ):
-            self._other_input._shared_velocity = self._velocity_input
+            self._command_provider._shared_velocity = self._velocity_input
 
         self._velocity_input.start()
-        self._other_input.start()
+        self._command_provider.start()
 
     def _create_velocity_input(self, source: InputSource):
         """Create velocity input provider. Override for policy-specific variants."""
@@ -392,27 +392,31 @@ class BasePolicy:
             return Ros2VelocityInput(self)
         raise ValueError(f"Unknown velocity input source: {source}")
 
-    def _create_other_input(self, source: InputSource):
+    def _create_command_provider(self, source: InputSource):
         """Create other input provider.
 
         Uses ``_keyboard_command_mapping`` / ``_joystick_command_mapping``
         class attributes — subclasses just override those instead of this method.
         """
         if source == InputSource.keyboard:
-            from holosoma_inference.inputs.impl.keyboard import KEYBOARD_BASE, KeyboardOtherInput, _ensure_keyboard_listener
+            from holosoma_inference.inputs.impl.keyboard import (
+                KEYBOARD_BASE,
+                KeyboardStateCommandProvider,
+                _ensure_keyboard_listener,
+            )
 
             _ensure_keyboard_listener(self)
             mapping = self._keyboard_command_mapping or KEYBOARD_BASE
-            return KeyboardOtherInput(mapping, self._get_keyboard_queue())
+            return KeyboardStateCommandProvider(mapping, self._get_keyboard_queue())
         if source == InputSource.joystick:
-            from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE, JoystickOtherInput
+            from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE, JoystickStateCommandProvider
 
-            return JoystickOtherInput(self, self._joystick_command_mapping or JOYSTICK_BASE)
+            return JoystickStateCommandProvider(self, self._joystick_command_mapping or JOYSTICK_BASE)
         if source == InputSource.ros2:
-            from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput
+            from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-            return Ros2OtherInput(self)
-        raise ValueError(f"Unknown other input source: {source}")
+            return Ros2StateCommandProvider(self)
+        raise ValueError(f"Unknown command provider source: {source}")
 
     def _get_keyboard_queue(self):
         """Get the keyboard listener queue, checking shared hardware source if needed."""
@@ -794,33 +798,33 @@ class BasePolicy:
         Subclasses override this to handle policy-specific commands,
         calling ``super()._dispatch_command(cmd)`` for unhandled ones.
         """
-        from holosoma_inference.inputs.api.commands import SWITCH_POLICY_INDEX, Command
+        from holosoma_inference.inputs.api.commands import SWITCH_POLICY_INDEX, StateCommand
 
-        if cmd == Command.START:
+        if cmd == StateCommand.START:
             self._handle_start_policy()
-        elif cmd == Command.STOP:
+        elif cmd == StateCommand.STOP:
             self._handle_stop_policy()
-        elif cmd == Command.INIT:
+        elif cmd == StateCommand.INIT:
             self._handle_init_state()
-        elif cmd == Command.KILL:
+        elif cmd == StateCommand.KILL:
             self.logger.info(colored("Killing program via command", "red"))
             sys.exit(0)
-        elif cmd == Command.NEXT_POLICY:
+        elif cmd == StateCommand.NEXT_POLICY:
             next_index = (self.active_policy_index + 1) % len(self.model_paths)
             self._activate_policy(next_index)
         elif cmd in SWITCH_POLICY_INDEX:
             index = SWITCH_POLICY_INDEX[cmd]
             if index != self.active_policy_index and 0 <= index < len(self.model_paths):
                 self._activate_policy(index)
-        elif cmd == Command.KP_UP:
+        elif cmd == StateCommand.KP_UP:
             self.interface.kp_level += 0.1
-        elif cmd == Command.KP_DOWN:
+        elif cmd == StateCommand.KP_DOWN:
             self.interface.kp_level -= 0.1
-        elif cmd == Command.KP_UP_FINE:
+        elif cmd == StateCommand.KP_UP_FINE:
             self.interface.kp_level += 0.01
-        elif cmd == Command.KP_DOWN_FINE:
+        elif cmd == StateCommand.KP_DOWN_FINE:
             self.interface.kp_level -= 0.01
-        elif cmd == Command.KP_RESET:
+        elif cmd == StateCommand.KP_RESET:
             self.interface.kp_level = 1.0
 
     # ============================================================================
@@ -874,7 +878,7 @@ class BasePolicy:
                 self.latency_tracker.start_cycle()
 
                 self._velocity_input.poll()
-                for cmd in self._other_input.poll():
+                for cmd in self._command_provider.poll():
                     self._dispatch_command(cmd)
                     self._print_control_status()
                 if self.use_phase:
