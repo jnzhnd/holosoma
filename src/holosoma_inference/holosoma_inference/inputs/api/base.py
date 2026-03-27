@@ -5,44 +5,46 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from holosoma_inference.inputs.api.commands import StateCommand
+from holosoma_inference.inputs.api.commands import StateCommand, VelocityCommand
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
 
 
 class VelocityInput(ABC):
-    """Provides continuous velocity commands (lin_vel, ang_vel) to a policy.
+    """Provides absolute velocity state each cycle.
 
-    Implementations write directly to policy.lin_vel_command and
-    policy.ang_vel_command via their stored policy reference.
+    Implementations read from their device (joystick sticks, keyboard
+    increments, ROS2 topic) and return a ``VelocityCommand`` with the
+    current absolute velocity, or ``None`` if no update is available.
     """
-
-    def __init__(self, policy: BasePolicy):
-        self.policy = policy
 
     @abstractmethod
     def start(self) -> None:
         """Initialize the input source (start threads, subscribe to topics, etc.)."""
 
-    def poll(self) -> None:
-        """Called each loop iteration. Override for polled sources (joystick)."""
+    def poll(self) -> VelocityCommand | None:
+        """Return current velocity, or None if this source has no update."""
+        return None
+
+    def zero(self) -> None:
+        """Reset internal velocity state to zero. Override for stateful sources (keyboard)."""
 
 
 class StateCommandProvider(ABC):
-    """Provides discrete commands to a policy via ``StateCommand`` enums.
+    """Provides discrete state commands each cycle.
 
-    Implementations translate device-specific inputs (buttons, keys, messages)
-    into ``StateCommand`` values.  The policy dispatches these commands via
-    ``_dispatch_command()``.
+    Implementations read from their device (keyboard keys, joystick buttons,
+    ROS2 topic) and return a list of ``StateCommand`` enums representing
+    user intent.
     """
 
-    def __init__(self, mapping: dict[str, StateCommand]):
+    def __init__(self, mapping: dict[str, StateCommand]) -> None:
         self._mapping = mapping
 
     def start(self) -> None:
-        """Initialize the input source. Override if needed."""
+        """Initialize the input source."""
 
     def poll(self) -> list[StateCommand]:
-        """Return all commands detected this cycle."""
+        """Return commands accumulated since last poll."""
         return []

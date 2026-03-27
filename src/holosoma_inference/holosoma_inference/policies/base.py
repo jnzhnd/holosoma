@@ -362,6 +362,12 @@ class BasePolicy:
             if other == InputSource.joystick:
                 other = InputSource.keyboard
 
+        # Ensure keyboard listener exists before creating providers (both subscribe)
+        if vel == InputSource.keyboard or other == InputSource.keyboard:
+            from holosoma_inference.inputs.impl.keyboard import _ensure_keyboard_listener
+
+            _ensure_keyboard_listener(self)
+
         self._velocity_input = self._create_velocity_input(vel)
         self._command_provider = self._create_command_provider(other)
 
@@ -376,12 +382,20 @@ class BasePolicy:
         self._velocity_input.start()
         self._command_provider.start()
 
+    # Class attributes for keyboard mappings — subclasses override these.
+    _keyboard_velocity_mapping = None
+
     def _create_velocity_input(self, source: InputSource):
-        """Create velocity input provider. Override for policy-specific variants."""
+        """Create velocity input provider.
+
+        Uses ``_keyboard_velocity_mapping`` class attribute for keyboard.
+        """
         if source == InputSource.keyboard:
             from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
 
-            return KeyboardVelocityInput(self)
+            listener = self._get_keyboard_listener()
+            queue = listener.subscribe() if listener else deque()
+            return KeyboardVelocityInput(queue, self._keyboard_velocity_mapping)
         if source == InputSource.joystick:
             from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
 
@@ -393,21 +407,18 @@ class BasePolicy:
         raise ValueError(f"Unknown velocity input source: {source}")
 
     def _create_command_provider(self, source: InputSource):
-        """Create other input provider.
+        """Create command provider.
 
         Uses ``_keyboard_command_mapping`` / ``_joystick_command_mapping``
         class attributes — subclasses just override those instead of this method.
         """
         if source == InputSource.keyboard:
-            from holosoma_inference.inputs.impl.keyboard import (
-                KEYBOARD_BASE,
-                KeyboardStateCommandProvider,
-                _ensure_keyboard_listener,
-            )
+            from holosoma_inference.inputs.impl.keyboard import KEYBOARD_BASE, KeyboardStateCommandProvider
 
-            _ensure_keyboard_listener(self)
+            listener = self._get_keyboard_listener()
+            queue = listener.subscribe() if listener else deque()
             mapping = self._keyboard_command_mapping or KEYBOARD_BASE
-            return KeyboardStateCommandProvider(mapping, self._get_keyboard_queue())
+            return KeyboardStateCommandProvider(mapping, queue)
         if source == InputSource.joystick:
             from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE, JoystickStateCommandProvider
 
@@ -418,14 +429,12 @@ class BasePolicy:
             return Ros2StateCommandProvider(self)
         raise ValueError(f"Unknown command provider source: {source}")
 
-    def _get_keyboard_queue(self):
-        """Get the keyboard listener queue, checking shared hardware source if needed."""
+    def _get_keyboard_listener(self):
+        """Get the keyboard listener, checking shared hardware source if needed."""
         listener = getattr(self, "_keyboard_listener", None)
         if listener is None and hasattr(self, "_shared_hardware_source"):
             listener = getattr(self._shared_hardware_source, "_keyboard_listener", None)
-        if listener is not None:
-            return listener._queue
-        return deque()
+        return listener
 
     def _init_ros_node(self):
         """Ensure rclpy is initialized and we have a ROS2 node."""
@@ -877,7 +886,10 @@ class BasePolicy:
             for it in itertools.count():
                 self.latency_tracker.start_cycle()
 
-                self._velocity_input.poll()
+                vc = self._velocity_input.poll()
+                if vc is not None:
+                    self.lin_vel_command = vc.lin_vel
+                    self.ang_vel_command = vc.ang_vel
                 for cmd in self._command_provider.poll():
                     self._dispatch_command(cmd)
                     self._print_control_status()

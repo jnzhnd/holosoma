@@ -5,8 +5,10 @@ from __future__ import annotations
 from collections import deque
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
-from holosoma_inference.inputs.api.commands import StateCommand
+from holosoma_inference.inputs.api.commands import StateCommand, VelocityCommand
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
@@ -27,6 +29,11 @@ ROS2_COMMAND_MAP: dict[str, StateCommand] = {
 class Ros2VelocityInput(VelocityInput):
     """Subscribes to ROS2 TwistStamped topic for velocity commands."""
 
+    def __init__(self, policy: BasePolicy):
+        self.policy = policy
+        self._lin_vel = np.zeros((1, 2))
+        self._ang_vel = np.zeros((1, 1))
+
     def start(self) -> None:
         self.policy._init_ros_node()
         from geometry_msgs.msg import TwistStamped
@@ -36,10 +43,13 @@ class Ros2VelocityInput(VelocityInput):
         self.policy.logger.info(f"Subscribed to ROS2 velocity topic: {topic}")
 
     def _callback(self, msg):
-        """Write velocity commands from ROS2. Clamps to training range."""
-        self.policy.lin_vel_command[0, 0] = max(-1.0, min(1.0, msg.twist.linear.x))
-        self.policy.lin_vel_command[0, 1] = max(-1.0, min(1.0, msg.twist.linear.y))
-        self.policy.ang_vel_command[0, 0] = max(-1.0, min(1.0, msg.twist.angular.z))
+        """Store velocity from ROS2. Clamps to training range."""
+        self._lin_vel[0, 0] = max(-1.0, min(1.0, msg.twist.linear.x))
+        self._lin_vel[0, 1] = max(-1.0, min(1.0, msg.twist.linear.y))
+        self._ang_vel[0, 0] = max(-1.0, min(1.0, msg.twist.angular.z))
+
+    def poll(self) -> VelocityCommand:
+        return VelocityCommand(self._lin_vel.copy(), self._ang_vel.copy())
 
 
 class Ros2StateCommandProvider(StateCommandProvider):

@@ -3,13 +3,14 @@ from termcolor import colored
 
 from holosoma_inference.inputs.api.commands import StateCommand
 from holosoma_inference.inputs.impl.joystick import JOYSTICK_LOCOMOTION
-from holosoma_inference.inputs.impl.keyboard import KEYBOARD_LOCOMOTION
+from holosoma_inference.inputs.impl.keyboard import KEYBOARD_LOCOMOTION, KEYBOARD_VELOCITY_LOCOMOTION
 
 from .base import BasePolicy
 
 
 class LocomotionPolicy(BasePolicy):
     _keyboard_command_mapping = KEYBOARD_LOCOMOTION
+    _keyboard_velocity_mapping = KEYBOARD_VELOCITY_LOCOMOTION
     _joystick_command_mapping = JOYSTICK_LOCOMOTION
 
     def __init__(self, config):
@@ -64,22 +65,6 @@ class LocomotionPolicy(BasePolicy):
         elif cmd == StateCommand.STAND:
             self.stand_command[0, 0] = 0
             self.logger.info("ROS2 command: stand")
-        elif cmd == StateCommand.VEL_FORWARD:
-            if self.stand_command[0, 0]:
-                self.lin_vel_command[0, 0] += 0.1
-        elif cmd == StateCommand.VEL_BACKWARD:
-            if self.stand_command[0, 0]:
-                self.lin_vel_command[0, 0] -= 0.1
-        elif cmd == StateCommand.VEL_LEFT:
-            if self.stand_command[0, 0]:
-                self.lin_vel_command[0, 1] += 0.1
-        elif cmd == StateCommand.VEL_RIGHT:
-            if self.stand_command[0, 0]:
-                self.lin_vel_command[0, 1] -= 0.1
-        elif cmd == StateCommand.ANG_VEL_LEFT:
-            self.ang_vel_command[0, 0] -= 0.1
-        elif cmd == StateCommand.ANG_VEL_RIGHT:
-            self.ang_vel_command[0, 0] += 0.1
         else:
             super()._dispatch_command(cmd)
 
@@ -87,6 +72,7 @@ class LocomotionPolicy(BasePolicy):
         """Handle stand command toggle."""
         self.stand_command[0, 0] = 1 - self.stand_command[0, 0]
         if self.stand_command[0, 0] == 0:
+            self._velocity_input.zero()
             self.ang_vel_command[0, 0] = 0.0
             self.lin_vel_command[0, 0] = 0.0
             self.lin_vel_command[0, 1] = 0.0
@@ -97,6 +83,7 @@ class LocomotionPolicy(BasePolicy):
 
     def _handle_zero_velocity(self):
         """Handle zero velocity command."""
+        self._velocity_input.zero()
         self.ang_vel_command[0, 0] = 0.0
         self.lin_vel_command[0, 0] = 0.0
         self.lin_vel_command[0, 1] = 0.0

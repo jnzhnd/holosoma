@@ -1,9 +1,10 @@
-"""State command enum for input providers.
+"""Command types for the input system.
 
-Commands represent user *intent* (e.g. "start the policy") decoupled from the
-physical input that triggered it (e.g. the A button on a joystick, or the ]
-key on a keyboard).  Policies dispatch on these enums — input providers only
-need to translate device events into the right enum value.
+``StateCommand`` enums represent discrete user *intent* (e.g. "start the
+policy") decoupled from the physical input that triggered it.
+
+``VelocityCommand`` is a value object carrying absolute velocity state
+produced by ``VelocityInput`` providers each cycle.
 
 Device-to-command mappings live in their respective impl modules
 (``keyboard.py``, ``joystick.py``, ``ros2.py``).
@@ -11,11 +12,25 @@ Device-to-command mappings live in their respective impl modules
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum, auto
+
+import numpy as np
+
+
+@dataclass(frozen=True)
+class VelocityCommand:
+    """Absolute velocity state emitted by VelocityInput providers.
+
+    Each field matches the shape used by the policy's internal state.
+    """
+
+    lin_vel: np.ndarray  # shape [1, 2] — linear x, y (m/s)
+    ang_vel: np.ndarray  # shape [1, 1] — angular z (rad/s)
 
 
 class StateCommand(Enum):
-    """All commands dispatched through the input system."""
+    """All discrete commands dispatched through the input system."""
 
     # --- Common ---
     START = auto()
@@ -43,12 +58,6 @@ class StateCommand(Enum):
     ZERO_VELOCITY = auto()
     WALK = auto()
     STAND = auto()
-    VEL_FORWARD = auto()
-    VEL_BACKWARD = auto()
-    VEL_LEFT = auto()
-    VEL_RIGHT = auto()
-    ANG_VEL_LEFT = auto()
-    ANG_VEL_RIGHT = auto()
 
     # --- Whole-body tracking ---
     START_MOTION_CLIP = auto()

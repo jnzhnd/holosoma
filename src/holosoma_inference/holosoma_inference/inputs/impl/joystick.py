@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
-from holosoma_inference.inputs.api.commands import StateCommand
+from holosoma_inference.inputs.api.commands import StateCommand, VelocityCommand
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
@@ -43,25 +43,24 @@ class JoystickVelocityInput(VelocityInput):
     """Reads joystick sticks for velocity. Caches button states for shared use."""
 
     def __init__(self, policy: BasePolicy):
-        super().__init__(policy)
+        self.policy = policy
         self.key_states: dict[str, bool] = {}
         self.last_key_states: dict[str, bool] = {}
 
     def start(self) -> None:
         pass  # Joystick hardware initialized by SDK
 
-    def poll(self) -> None:
+    def poll(self) -> VelocityCommand | None:
         if self.policy.interface.get_joystick_msg() is None:
-            return
+            return None
         self.last_key_states = self.key_states.copy()
-        self.policy.lin_vel_command, self.policy.ang_vel_command, self.key_states = (
-            self.policy.interface.process_joystick_input(
-                self.policy.lin_vel_command,
-                self.policy.ang_vel_command,
-                self.policy.stand_command,
-                False,
-            )
+        lin_vel, ang_vel, self.key_states = self.policy.interface.process_joystick_input(
+            self.policy.lin_vel_command,
+            self.policy.ang_vel_command,
+            self.policy.stand_command,
+            False,
         )
+        return VelocityCommand(lin_vel, ang_vel)
 
 
 class JoystickStateCommandProvider(StateCommandProvider):

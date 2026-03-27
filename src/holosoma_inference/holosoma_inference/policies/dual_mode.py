@@ -76,8 +76,8 @@ class DualModePolicy:
         """Inject SWITCH_MODE into mappings and patch dispatch for routing.
 
         Keyboard queue wiring is handled by the factory — the secondary's
-        ``KeyboardOtherInput`` already shares the primary's listener queue
-        via ``_get_keyboard_queue()`` + ``_shared_hardware_source``.
+        ``KeyboardStateCommandProvider`` gets its own subscriber queue from the
+        shared ``KeyboardListener`` via ``_get_keyboard_listener()``.
         Only ``_dispatch_command`` needs patching to intercept SWITCH_MODE.
         """
         from holosoma_inference.inputs.api.commands import StateCommand
@@ -143,7 +143,10 @@ class DualModePolicy:
             for it in itertools.count():
                 self.active.latency_tracker.start_cycle()
 
-                self.active._velocity_input.poll()
+                vc = self.active._velocity_input.poll()
+                if vc is not None:
+                    self.active.lin_vel_command = vc.lin_vel
+                    self.active.ang_vel_command = vc.ang_vel
                 for cmd in self.active._command_provider.poll():
                     self.active._dispatch_command(cmd)
                     self.active._print_control_status()
