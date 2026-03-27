@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from holosoma_inference.inputs.base import OtherInput, VelocityInput
+from holosoma_inference.inputs.api.base import OtherInput, VelocityInput
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy

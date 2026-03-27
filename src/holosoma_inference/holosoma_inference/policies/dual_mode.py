@@ -80,7 +80,7 @@ class DualModePolicy:
         via ``_get_keyboard_queue()`` + ``_shared_hardware_source``.
         Only ``_dispatch_command`` needs patching to intercept SWITCH_MODE.
         """
-        from holosoma_inference.inputs.commands import DualModeCommand
+        from holosoma_inference.inputs.api.commands import DualModeCommand
 
         # Inject the switch-mode key into both policies' other_input mappings
         for p in (self.primary, self.secondary):
@@ -114,7 +114,7 @@ class DualModePolicy:
 
         # Carry over joystick key_states so edge detection doesn't see a false
         # rising edge on the X button (which is still physically held down).
-        from holosoma_inference.inputs.joystick import JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
 
         active_vel = self.active._velocity_input
         target_vel = target._velocity_input

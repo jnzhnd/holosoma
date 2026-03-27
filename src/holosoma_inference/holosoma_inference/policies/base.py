@@ -34,7 +34,7 @@ class BasePolicy:
     """
 
     # Subclasses override these to get policy-specific key bindings.
-    # See holosoma_inference.inputs.commands for available mappings.
+    # See holosoma_inference.inputs.api.commands for available mappings.
     _keyboard_command_mapping = None  # Set lazily to avoid circular import
     _joystick_command_mapping = None
 
@@ -366,7 +366,7 @@ class BasePolicy:
         self._other_input = self._create_other_input(other)
 
         # Wire shared joystick state when both channels use joystick
-        from holosoma_inference.inputs.joystick import JoystickOtherInput, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickOtherInput, JoystickVelocityInput
 
         if isinstance(self._other_input, JoystickOtherInput) and isinstance(
             self._velocity_input, JoystickVelocityInput
@@ -379,15 +379,15 @@ class BasePolicy:
     def _create_velocity_input(self, source: InputSource):
         """Create velocity input provider. Override for policy-specific variants."""
         if source == InputSource.keyboard:
-            from holosoma_inference.inputs.keyboard import KeyboardVelocityInput
+            from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
 
             return KeyboardVelocityInput(self)
         if source == InputSource.joystick:
-            from holosoma_inference.inputs.joystick import JoystickVelocityInput
+            from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
 
             return JoystickVelocityInput(self)
         if source == InputSource.ros2:
-            from holosoma_inference.inputs.ros2 import Ros2VelocityInput
+            from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
 
             return Ros2VelocityInput(self)
         raise ValueError(f"Unknown velocity input source: {source}")
@@ -399,19 +399,19 @@ class BasePolicy:
         class attributes — subclasses just override those instead of this method.
         """
         if source == InputSource.keyboard:
-            from holosoma_inference.inputs.commands import KEYBOARD_BASE
-            from holosoma_inference.inputs.keyboard import KeyboardOtherInput, _ensure_keyboard_listener
+            from holosoma_inference.inputs.api.commands import KEYBOARD_BASE
+            from holosoma_inference.inputs.impl.keyboard import KeyboardOtherInput, _ensure_keyboard_listener
 
             _ensure_keyboard_listener(self)
             mapping = self._keyboard_command_mapping or KEYBOARD_BASE
             return KeyboardOtherInput(mapping, self._get_keyboard_queue())
         if source == InputSource.joystick:
-            from holosoma_inference.inputs.commands import JOYSTICK_BASE
-            from holosoma_inference.inputs.joystick import JoystickOtherInput
+            from holosoma_inference.inputs.api.commands import JOYSTICK_BASE
+            from holosoma_inference.inputs.impl.joystick import JoystickOtherInput
 
             return JoystickOtherInput(self, self._joystick_command_mapping or JOYSTICK_BASE)
         if source == InputSource.ros2:
-            from holosoma_inference.inputs.ros2 import Ros2OtherInput
+            from holosoma_inference.inputs.impl.ros2 import Ros2OtherInput
 
             return Ros2OtherInput(self)
         raise ValueError(f"Unknown other input source: {source}")
@@ -796,7 +796,7 @@ class BasePolicy:
         Subclasses override this to handle policy-specific commands,
         calling ``super()._dispatch_command(cmd)`` for unhandled ones.
         """
-        from holosoma_inference.inputs.commands import SWITCH_POLICY_INDEX, Command
+        from holosoma_inference.inputs.api.commands import SWITCH_POLICY_INDEX, Command
 
         if cmd == Command.START:
             self._handle_start_policy()

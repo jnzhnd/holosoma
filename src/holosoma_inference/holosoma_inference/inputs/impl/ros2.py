@@ -6,8 +6,8 @@ from collections import deque
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from holosoma_inference.inputs.base import OtherInput, VelocityInput
-from holosoma_inference.inputs.commands import ROS2_COMMAND_MAP
+from holosoma_inference.inputs.api.base import OtherInput, VelocityInput
+from holosoma_inference.inputs.api.commands import ROS2_COMMAND_MAP
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy

@@ -1,7 +1,7 @@
 import numpy as np
 from termcolor import colored
 
-from holosoma_inference.inputs.commands import JOYSTICK_LOCOMOTION, KEYBOARD_LOCOMOTION
+from holosoma_inference.inputs.api.commands import JOYSTICK_LOCOMOTION, KEYBOARD_LOCOMOTION
 
 from .base import BasePolicy
 
@@ -51,7 +51,7 @@ class LocomotionPolicy(BasePolicy):
             self.is_standing = False
 
     def _dispatch_command(self, cmd):
-        from holosoma_inference.inputs.commands import LocomotionCommand
+        from holosoma_inference.inputs.api.commands import LocomotionCommand
 
         if cmd == LocomotionCommand.STAND_TOGGLE:
             self._handle_stand_command()

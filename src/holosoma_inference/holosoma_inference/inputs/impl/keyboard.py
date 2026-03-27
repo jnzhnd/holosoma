@@ -7,7 +7,9 @@ import threading
 from collections import deque
 from typing import TYPE_CHECKING
 
-from holosoma_inference.inputs.base import OtherInput, VelocityInput
+from sshkeyboard import listen_keyboard
+
+from holosoma_inference.inputs.api.base import OtherInput, VelocityInput
 
 if TYPE_CHECKING:
     from enum import Enum
@@ -49,8 +51,6 @@ class KeyboardListener:
         self._policy.logger.info("Keyboard Listener Initialized")
 
     def _listen(self) -> None:
-        from sshkeyboard import listen_keyboard
-
         def on_press(keycode):
             self._queue.append(keycode)
 

@@ -10,7 +10,7 @@ from loguru import logger
 from termcolor import colored
 
 from holosoma_inference.config.config_types.inference import InferenceConfig
-from holosoma_inference.inputs.commands import JOYSTICK_WBT, KEYBOARD_WBT
+from holosoma_inference.inputs.api.commands import JOYSTICK_WBT, KEYBOARD_WBT
 from holosoma_inference.policies import BasePolicy
 from holosoma_inference.policies.wbt_utils import MotionClockUtil, PinocchioRobot, TimestepUtil
 from holosoma_inference.utils.clock import ClockSub
@@ -412,7 +412,7 @@ class WholeBodyTrackingPolicy(BasePolicy):
             self.logger.info(colored("Starting motion clip", "blue"))
 
     def _dispatch_command(self, cmd):
-        from holosoma_inference.inputs.commands import WbtCommand
+        from holosoma_inference.inputs.api.commands import WbtCommand
 
         if cmd == WbtCommand.START_MOTION_CLIP:
             self._handle_start_motion_clip()
