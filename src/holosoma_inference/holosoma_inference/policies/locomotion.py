@@ -2,11 +2,15 @@ import numpy as np
 from termcolor import colored
 
 from holosoma_inference.config.config_types.task import InputSource
+from holosoma_inference.inputs.commands import JOYSTICK_LOCOMOTION, KEYBOARD_LOCOMOTION
 
 from .base import BasePolicy
 
 
 class LocomotionPolicy(BasePolicy):
+    _keyboard_command_mapping = KEYBOARD_LOCOMOTION
+    _joystick_command_mapping = JOYSTICK_LOCOMOTION
+
     def __init__(self, config):
         super().__init__(config)
         self.is_standing = False
@@ -53,19 +57,6 @@ class LocomotionPolicy(BasePolicy):
 
             return LocomotionKeyboardVelocityInput(self)
         return super()._create_velocity_input(source)
-
-    def _create_other_input(self, source):
-        if source == InputSource.keyboard:
-            from holosoma_inference.inputs.commands import KEYBOARD_LOCOMOTION
-            from holosoma_inference.inputs.keyboard import KeyboardOtherInput
-
-            return KeyboardOtherInput(self, KEYBOARD_LOCOMOTION)
-        if source == InputSource.joystick:
-            from holosoma_inference.inputs.commands import JOYSTICK_LOCOMOTION
-            from holosoma_inference.inputs.joystick import JoystickOtherInput
-
-            return JoystickOtherInput(self, JOYSTICK_LOCOMOTION)
-        return super()._create_other_input(source)
 
     def _dispatch_command(self, cmd):
         from holosoma_inference.inputs.commands import LocomotionCommand

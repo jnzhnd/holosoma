@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import sys
 import threading
-from enum import Enum
 from typing import TYPE_CHECKING
 
 from holosoma_inference.inputs.base import OtherInput, VelocityInput
@@ -92,9 +91,6 @@ class KeyboardOtherInput(OtherInput):
     Key-to-command translation is fully determined by the mapping passed
     at construction time — no subclassing needed for policy-specific keys.
     """
-
-    def __init__(self, policy: BasePolicy, mapping: dict[str, Enum]):
-        super().__init__(policy, mapping)
 
     def start(self) -> None:
         _ensure_keyboard_listener(self.policy)

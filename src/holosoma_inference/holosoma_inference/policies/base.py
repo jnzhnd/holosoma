@@ -33,6 +33,11 @@ class BasePolicy:
     Supports both simulation and real robot deployment with keyboard/joystick controls.
     """
 
+    # Subclasses override these to get policy-specific key bindings.
+    # See holosoma_inference.inputs.commands for available mappings.
+    _keyboard_command_mapping = None  # Set lazily to avoid circular import
+    _joystick_command_mapping = None
+
     def __init__(self, config: InferenceConfig):
         """Initialize the base policy with configuration and model."""
         self.config = config
@@ -388,17 +393,21 @@ class BasePolicy:
         raise ValueError(f"Unknown velocity input source: {source}")
 
     def _create_other_input(self, source: InputSource):
-        """Create other input provider. Override for policy-specific variants."""
+        """Create other input provider.
+
+        Uses ``_keyboard_command_mapping`` / ``_joystick_command_mapping``
+        class attributes — subclasses just override those instead of this method.
+        """
         if source == InputSource.keyboard:
             from holosoma_inference.inputs.commands import KEYBOARD_BASE
             from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
-            return KeyboardOtherInput(self, KEYBOARD_BASE)
+            return KeyboardOtherInput(self, self._keyboard_command_mapping or KEYBOARD_BASE)
         if source == InputSource.joystick:
             from holosoma_inference.inputs.commands import JOYSTICK_BASE
             from holosoma_inference.inputs.joystick import JoystickOtherInput
 
-            return JoystickOtherInput(self, JOYSTICK_BASE)
+            return JoystickOtherInput(self, self._joystick_command_mapping or JOYSTICK_BASE)
         if source == InputSource.ros2:
             from holosoma_inference.inputs.ros2 import Ros2OtherInput
 

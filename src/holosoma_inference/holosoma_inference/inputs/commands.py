@@ -61,17 +61,7 @@ class DualModeCommand(Enum):
 
 
 # Maps SWITCH_POLICY_N commands to 0-based policy indices.
-SWITCH_POLICY_INDEX: dict[Command, int] = {
-    Command.SWITCH_POLICY_1: 0,
-    Command.SWITCH_POLICY_2: 1,
-    Command.SWITCH_POLICY_3: 2,
-    Command.SWITCH_POLICY_4: 3,
-    Command.SWITCH_POLICY_5: 4,
-    Command.SWITCH_POLICY_6: 5,
-    Command.SWITCH_POLICY_7: 6,
-    Command.SWITCH_POLICY_8: 7,
-    Command.SWITCH_POLICY_9: 8,
-}
+SWITCH_POLICY_INDEX: dict[Command, int] = {Command[f"SWITCH_POLICY_{n}"]: n - 1 for n in range(1, 10)}
 
 
 # ---------------------------------------------------------------------------

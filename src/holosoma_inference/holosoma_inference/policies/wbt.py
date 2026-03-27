@@ -10,7 +10,7 @@ from loguru import logger
 from termcolor import colored
 
 from holosoma_inference.config.config_types.inference import InferenceConfig
-from holosoma_inference.config.config_types.task import InputSource
+from holosoma_inference.inputs.commands import JOYSTICK_WBT, KEYBOARD_WBT
 from holosoma_inference.policies import BasePolicy
 from holosoma_inference.policies.wbt_utils import MotionClockUtil, PinocchioRobot, TimestepUtil
 from holosoma_inference.utils.clock import ClockSub
@@ -26,6 +26,9 @@ from holosoma_inference.utils.math.quat import (
 
 
 class WholeBodyTrackingPolicy(BasePolicy):
+    _keyboard_command_mapping = KEYBOARD_WBT
+    _joystick_command_mapping = JOYSTICK_WBT
+
     def __init__(self, config: InferenceConfig):
         self.config = config
 
@@ -407,19 +410,6 @@ class WholeBodyTrackingPolicy(BasePolicy):
             self.logger.info(colored(f"Starting motion clip from timestep {start_str} to {end_str}", "blue"))
         else:
             self.logger.info(colored("Starting motion clip", "blue"))
-
-    def _create_other_input(self, source):
-        if source == InputSource.keyboard:
-            from holosoma_inference.inputs.commands import KEYBOARD_WBT
-            from holosoma_inference.inputs.keyboard import KeyboardOtherInput
-
-            return KeyboardOtherInput(self, KEYBOARD_WBT)
-        if source == InputSource.joystick:
-            from holosoma_inference.inputs.commands import JOYSTICK_WBT
-            from holosoma_inference.inputs.joystick import JoystickOtherInput
-
-            return JoystickOtherInput(self, JOYSTICK_WBT)
-        return super()._create_other_input(source)
 
     def _dispatch_command(self, cmd):
         from holosoma_inference.inputs.commands import WbtCommand

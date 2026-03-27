@@ -16,9 +16,6 @@ if TYPE_CHECKING:
 class Ros2VelocityInput(VelocityInput):
     """Subscribes to ROS2 TwistStamped topic for velocity commands."""
 
-    def __init__(self, policy: BasePolicy):
-        super().__init__(policy)
-
     def start(self) -> None:
         self.policy._init_ros_node()
         from geometry_msgs.msg import TwistStamped
