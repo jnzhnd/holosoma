@@ -2,22 +2,14 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from typing import Literal
 
 from pydantic.dataclasses import dataclass
 
+InputSource = Literal["keyboard", "interface", "joystick", "ros2"]
 
-class InputSource(str, Enum):
-    """Available input sources for velocity and other_input channels."""
-
-    keyboard = "keyboard"
-    interface = "interface"
-    joystick = "joystick"  # evdev gamepad (Xbox/Logitech/Beitong) — not yet implemented
-    ros2 = "ros2"
-
-
-DEFAULT_VELOCITY_INPUT = InputSource.keyboard
-DEFAULT_OTHER_INPUT = InputSource.keyboard
+DEFAULT_VELOCITY_INPUT: InputSource = "keyboard"
+DEFAULT_OTHER_INPUT: InputSource = "keyboard"
 
 
 @dataclass(frozen=True)
@@ -122,17 +114,17 @@ class TaskConfig:
                 "Use one shortcut or set --task.velocity-input and --task.other-input individually."
             )
 
-        shortcut = None
+        shortcut: InputSource | None = None
         if self.use_joystick:
-            shortcut = InputSource.interface
+            shortcut = "interface"
         elif self.use_keyboard:
-            shortcut = InputSource.keyboard
+            shortcut = "keyboard"
 
         if shortcut is not None:
             has_custom_input = self.velocity_input != DEFAULT_VELOCITY_INPUT or self.other_input != DEFAULT_OTHER_INPUT
             if has_custom_input:
                 raise ValueError(
-                    f"Cannot combine --task.use-{shortcut.value} with --task.velocity-input or "
+                    f"Cannot combine --task.use-{shortcut} with --task.velocity-input or "
                     "--task.other-input. Use either the shortcut flag or the individual "
                     "input settings, not both."
                 )

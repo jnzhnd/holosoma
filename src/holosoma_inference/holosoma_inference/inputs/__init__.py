@@ -14,17 +14,17 @@ if TYPE_CHECKING:
 
 def create_input(policy: BasePolicy, source: InputSource, role: str):
     """Create an input provider for the given source and role ("velocity" or "command")."""
-    if not policy.use_joystick and source in (InputSource.interface, InputSource.joystick):
-        source = InputSource.keyboard
+    if not policy.use_joystick and source in ("interface", "joystick"):
+        source = "keyboard"
 
-    if source in (InputSource.interface, InputSource.joystick):
+    if source in ("interface", "joystick"):
         return InterfaceInput(policy.interface, JOYSTICK_COMMANDS)
 
-    if source == InputSource.keyboard:
+    if source == "keyboard":
         velocity_keys = getattr(policy, "_keyboard_velocity_mapping", None)
         return KeyboardInput.create(policy, velocity_keys=velocity_keys)
 
-    if source == InputSource.ros2:
+    if source == "ros2":
         if role == "velocity":
             return Ros2VelCmdProvider(policy)
         return Ros2StateCommandProvider(policy)

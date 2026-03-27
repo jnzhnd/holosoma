@@ -18,7 +18,6 @@ from termcolor import colored
 
 from holosoma_inference.config.config_types.inference import InferenceConfig
 from holosoma_inference.config.config_types.robot import RobotConfig
-from holosoma_inference.config.config_types.task import InputSource
 from holosoma_inference.inputs import create_input
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 from holosoma_inference.sdk import create_interface
@@ -148,7 +147,7 @@ class BasePolicy:
         # Derive use_joystick for SDK: True if interface/joystick is used for either channel
         vel = self.config.task.velocity_input
         other = self.config.task.other_input
-        need_joystick = bool({InputSource.interface, InputSource.joystick} & {vel, other})
+        need_joystick = bool({"interface", "joystick"} & {vel, other})
         self.interface = create_interface(
             self.robot_config,
             self.config.task.domain_id,
@@ -328,7 +327,7 @@ class BasePolicy:
         sources = {vel, other}
 
         # Joystick hardware (needed if either channel uses interface or joystick)
-        if {InputSource.interface, InputSource.joystick} & sources:
+        if {"interface", "joystick"} & sources:
             self._init_joystick_handler()
         else:
             self.use_joystick = False

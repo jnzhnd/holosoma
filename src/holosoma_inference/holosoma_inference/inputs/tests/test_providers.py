@@ -17,7 +17,6 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from holosoma_inference.config.config_types.task import InputSource
 from holosoma_inference.inputs import create_input
 from holosoma_inference.inputs.api.base import StateCommandProvider, VelCmdProvider
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
@@ -701,7 +700,7 @@ class TestCreateInputFactory:
         from holosoma_inference.inputs.impl.keyboard import KeyboardInput
 
         p = self._make_policy_for_factory(monkeypatch)
-        result = create_input(p, InputSource.keyboard, "velocity")
+        result = create_input(p, "keyboard", "velocity")
         assert isinstance(result, KeyboardInput)
         assert result._mapping is KEYBOARD_COMMANDS
 
@@ -709,7 +708,7 @@ class TestCreateInputFactory:
         from holosoma_inference.inputs.impl.interface import InterfaceInput
 
         p = self._make_policy_for_factory()
-        result = create_input(p, InputSource.interface, "velocity")
+        result = create_input(p, "interface", "velocity")
         assert isinstance(result, InterfaceInput)
         assert result._mapping is JOYSTICK_COMMANDS
 
@@ -717,21 +716,21 @@ class TestCreateInputFactory:
         from holosoma_inference.inputs.impl.interface import InterfaceInput
 
         p = self._make_policy_for_factory()
-        result = create_input(p, InputSource.joystick, "velocity")
+        result = create_input(p, "joystick", "velocity")
         assert isinstance(result, InterfaceInput)
 
     def test_ros2_velocity(self):
         from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
         p = self._make_policy_for_factory()
-        result = create_input(p, InputSource.ros2, "velocity")
+        result = create_input(p, "ros2", "velocity")
         assert isinstance(result, Ros2VelCmdProvider)
 
     def test_ros2_command(self):
         from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
         p = self._make_policy_for_factory()
-        result = create_input(p, InputSource.ros2, "command")
+        result = create_input(p, "ros2", "command")
         assert isinstance(result, Ros2StateCommandProvider)
 
     def test_unknown_source_raises(self):
@@ -743,7 +742,7 @@ class TestCreateInputFactory:
         from holosoma_inference.inputs.impl.keyboard import KeyboardInput
 
         p = self._make_policy_for_factory(monkeypatch, use_joystick=False)
-        result = create_input(p, InputSource.interface, "velocity")
+        result = create_input(p, "interface", "velocity")
         assert isinstance(result, KeyboardInput)
 
     def test_both_same_source_shares_object(self):
@@ -753,7 +752,7 @@ class TestCreateInputFactory:
 
         p = self._make_policy_for_factory()
         p.config = SimpleNamespace(
-            task=SimpleNamespace(velocity_input=InputSource.interface, other_input=InputSource.interface)
+            task=SimpleNamespace(velocity_input="interface", other_input="interface")
         )
         BasePolicy._create_input_providers(p)
         assert p._velocity_input is p._command_provider
@@ -765,7 +764,7 @@ class TestCreateInputFactory:
 
         p = self._make_policy_for_factory(monkeypatch, use_joystick=False)
         p.config = SimpleNamespace(
-            task=SimpleNamespace(velocity_input=InputSource.keyboard, other_input=InputSource.keyboard)
+            task=SimpleNamespace(velocity_input="keyboard", other_input="keyboard")
         )
         BasePolicy._create_input_providers(p)
         assert p._velocity_input is p._command_provider
@@ -776,7 +775,7 @@ class TestCreateInputFactory:
 
         p = self._make_policy_for_factory(monkeypatch)
         p._keyboard_velocity_mapping = KEYBOARD_VELOCITY_LOCOMOTION
-        result = create_input(p, InputSource.keyboard, "velocity")
+        result = create_input(p, "keyboard", "velocity")
         assert type(result) is KeyboardInput
         assert result._velocity_keys is KEYBOARD_VELOCITY_LOCOMOTION
 
@@ -784,7 +783,7 @@ class TestCreateInputFactory:
         from holosoma_inference.inputs.impl.keyboard import KeyboardInput
 
         p = self._make_policy_for_factory(monkeypatch)
-        result = create_input(p, InputSource.keyboard, "velocity")
+        result = create_input(p, "keyboard", "velocity")
         assert type(result) is KeyboardInput
         assert result._velocity_keys == {}
 
@@ -1110,12 +1109,9 @@ class TestVelocityCommand:
 
 
 class TestInputSource:
-    def test_interface_exists(self):
-        assert InputSource.interface == "interface"
-
     def test_use_joystick_maps_to_interface(self):
         from holosoma_inference.config.config_types.task import TaskConfig
 
         tc = TaskConfig(model_path="test.onnx", use_joystick=True)
-        assert tc.velocity_input == InputSource.interface
-        assert tc.other_input == InputSource.interface
+        assert tc.velocity_input == "interface"
+        assert tc.other_input == "interface"
