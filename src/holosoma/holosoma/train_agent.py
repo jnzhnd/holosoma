@@ -170,7 +170,7 @@ def train(tyro_config: ExperimentConfig, training_context: TrainingContext | Non
         distributed_conf: MultGPUConfig | None = configure_multi_gpu()
         device: str = get_device(tyro_config, distributed_conf)
         is_distributed = distributed_conf is not None
-        is_main_process = distributed_conf is None or distributed_conf["local_rank"] == 0
+        is_main_process = distributed_conf is None or distributed_conf["global_rank"] == 0
 
         # Configure logger
         logger_cfg = tyro_config.logger

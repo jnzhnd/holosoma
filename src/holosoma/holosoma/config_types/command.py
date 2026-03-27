@@ -90,6 +90,10 @@ class MotionConfig:
     motion_file: str
     """Motion file (.npz) that contains motion_clips to track. """
 
+    motion_dir: str = ""
+    """Directory (or comma-separated directories) of .npz motion files.
+    When non-empty, takes precedence over motion_file."""
+
     body_name_ref: list[str]
     """Body name of the reference frame (in general, torso_link). """
     body_names_to_track: list[str]
