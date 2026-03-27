@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -32,26 +33,25 @@ class VelocityInput(ABC):
 
 
 class OtherInput(ABC):
-    """Provides discrete commands (start/stop, walk/stand, kp tuning) to a policy.
+    """Provides discrete commands to a policy via command enums.
 
-    Implementations call policy methods like _handle_start_policy(),
-    _handle_stand_command(), etc.
+    Implementations translate device-specific inputs (buttons, keys, messages)
+    into command enums defined in ``holosoma_inference.inputs.commands``.
+    The policy dispatches these commands via ``_dispatch_command()``.
     """
 
-    def __init__(self, policy: BasePolicy):
+    def __init__(self, policy: BasePolicy, mapping: dict[str, Enum]):
         self.policy = policy
+        self._mapping = mapping
 
     @abstractmethod
     def start(self) -> None:
         """Initialize the input source."""
 
-    def poll(self) -> None:
-        """Called each loop iteration. Override for polled sources (joystick)."""
+    def poll(self) -> list[Enum]:
+        """Return all commands detected this cycle."""
+        return []
 
-    def handle_key(self, keycode: str) -> bool:
-        """Handle a keyboard keypress. Return True if consumed."""
-        return False
-
-    def handle_joystick_button(self, key: str) -> bool:
-        """Handle a joystick button press. Return True if consumed."""
-        return False
+    def map_key(self, keycode: str) -> Enum | None:
+        """Map a keyboard keycode to a command, or None if unmapped."""
+        return self._mapping.get(keycode)

@@ -69,42 +69,52 @@ class DualModePolicy:
         self.active = self.primary
         self.active_label = "primary"
 
-        self._patch_button_handlers()
+        self._setup_command_intercept()
         logger.info(colored("Dual-mode ready. Press X (joystick) or x (keyboard) to switch policies.", "magenta"))
 
-    def _patch_button_handlers(self):
-        """Intercept X (joystick) and x (keyboard) for mode switching.
+    def _setup_command_intercept(self):
+        """Inject SWITCH_MODE into mappings and patch keyboard/dispatch for routing.
 
-        The keyboard/joystick listener thread belongs to the primary policy,
-        so we only need to patch the primary. For non-switch keys, delegate
-        to whichever policy is currently active.
+        Two patches are needed:
+        1. ``handle_keyboard_button`` — the keyboard listener thread belongs to
+           the primary policy, so we redirect keyboard input to whichever policy
+           is currently active.
+        2. ``_dispatch_command`` — intercept SWITCH_MODE before it reaches the
+           active policy's normal dispatch chain.
         """
-        # Store original (unpatched) handlers per policy for delegation
-        self._orig_joy = {
-            id(self.primary): self.primary.handle_joystick_button,
-            id(self.secondary): self.secondary.handle_joystick_button,
-        }
+        from holosoma_inference.inputs.commands import DualModeCommand
+
+        # Inject the switch-mode key into both policies' other_input mappings
+        for p in (self.primary, self.secondary):
+            p._other_input._mapping["X"] = DualModeCommand.SWITCH_MODE
+            p._other_input._mapping["x"] = DualModeCommand.SWITCH_MODE
+
+        # Patch keyboard handler to route to the active policy
         self._orig_kb = {
             id(self.primary): self.primary.handle_keyboard_button,
             id(self.secondary): self.secondary.handle_keyboard_button,
         }
 
-        def patched_joy(cur_key):
-            if cur_key == "X":
-                self._handle_mode_switch()
-            else:
-                self._orig_joy[id(self.active)](cur_key)
-
         def patched_kb(keycode):
-            if keycode == "x":
+            self._orig_kb[id(self.active)](keycode)
+
+        self.primary.handle_keyboard_button = patched_kb
+        self.secondary.handle_keyboard_button = patched_kb
+
+        # Patch _dispatch_command to intercept SWITCH_MODE
+        self._orig_dispatch = {
+            id(self.primary): self.primary._dispatch_command,
+            id(self.secondary): self.secondary._dispatch_command,
+        }
+
+        def patched_dispatch(cmd):
+            if cmd == DualModeCommand.SWITCH_MODE:
                 self._handle_mode_switch()
             else:
-                self._orig_kb[id(self.active)](keycode)
+                self._orig_dispatch[id(self.active)](cmd)
 
-        self.primary.handle_joystick_button = patched_joy
-        self.primary.handle_keyboard_button = patched_kb
-        self.secondary.handle_joystick_button = patched_joy
-        self.secondary.handle_keyboard_button = patched_kb
+        self.primary._dispatch_command = patched_dispatch
+        self.secondary._dispatch_command = patched_dispatch
 
     def _handle_mode_switch(self):
         """Switch from active to inactive policy."""
@@ -148,7 +158,9 @@ class DualModePolicy:
                 self.active.latency_tracker.start_cycle()
 
                 self.active._velocity_input.poll()
-                self.active._other_input.poll()
+                for cmd in self.active._other_input.poll():
+                    self.active._dispatch_command(cmd)
+                    self.active._print_control_status()
                 if self.active.use_phase:
                     self.active.update_phase_time()
 

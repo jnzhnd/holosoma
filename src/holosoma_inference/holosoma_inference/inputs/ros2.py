@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections import deque
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from holosoma_inference.inputs.base import OtherInput, VelocityInput
+from holosoma_inference.inputs.commands import ROS2_COMMAND_MAP
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
@@ -32,10 +35,15 @@ class Ros2VelocityInput(VelocityInput):
 
 
 class Ros2OtherInput(OtherInput):
-    """Subscribes to ROS2 String topic for discrete commands."""
+    """Subscribes to ROS2 String topic for discrete commands.
+
+    Incoming string commands are mapped to enum values via ``ROS2_COMMAND_MAP``
+    and queued.  The main loop drains them via ``poll()``.
+    """
 
     def __init__(self, policy: BasePolicy):
-        super().__init__(policy)
+        super().__init__(policy, {})  # ROS2 uses its own string-to-command map
+        self._queue: deque[Enum] = deque()
 
     def start(self) -> None:
         self.policy._init_ros_node()
@@ -46,20 +54,20 @@ class Ros2OtherInput(OtherInput):
         self.policy.logger.info(f"Subscribed to ROS2 other_input topic: {topic}")
 
     def _callback(self, msg):
-        """Handle discrete commands from ROS2 other_input topic."""
-        cmd = msg.data.strip().lower()
-        if cmd == "walk":
-            self.policy.stand_command[0, 0] = 1
-            self.policy.base_height_command[0, 0] = self.policy.desired_base_height
-            self.policy.logger.info("ROS2 command: walk")
-        elif cmd == "stand":
-            self.policy.stand_command[0, 0] = 0
-            self.policy.logger.info("ROS2 command: stand")
-        elif cmd == "start":
-            self.policy._handle_start_policy()
-        elif cmd == "stop":
-            self.policy._handle_stop_policy()
-        elif cmd == "init":
-            self.policy._handle_init_state()
+        """Map ROS2 string command to enum and queue it."""
+        cmd_str = msg.data.strip().lower()
+        cmd = ROS2_COMMAND_MAP.get(cmd_str)
+        if cmd is not None:
+            self._queue.append(cmd)
         else:
-            self.policy.logger.warning(f"ROS2 command: unknown command '{cmd}'")
+            self.policy.logger.warning(f"ROS2 command: unknown command '{cmd_str}'")
+
+    def poll(self) -> list[Enum]:
+        """Drain all queued commands."""
+        commands: list[Enum] = []
+        while True:
+            try:
+                commands.append(self._queue.popleft())
+            except IndexError:
+                break
+        return commands

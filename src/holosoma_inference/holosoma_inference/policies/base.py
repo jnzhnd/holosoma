@@ -237,23 +237,6 @@ class BasePolicy:
             name = Path(self.active_model_path).name
             self.logger.info(colored(f"Switched to policy [{index + 1}]: {name}", "blue"))
 
-    def _try_switch_policy_key(self, keycode: str) -> bool:
-        """Switch policy slot if a numeric key is pressed."""
-        if len(self.model_paths) <= 1:
-            return False
-        if not keycode.isdigit():
-            return False
-        slot = int(keycode)
-        if slot == 0:
-            return False
-        index = slot - 1
-        if index == self.active_policy_index:
-            return True
-        if 0 <= index < len(self.model_paths):
-            self._activate_policy(index)
-            return True
-        return False
-
     def _on_policy_switched(self, model_path: str):
         """Hook for derived classes to reset state after loading a new policy."""
         _ = model_path
@@ -380,7 +363,9 @@ class BasePolicy:
         # Wire shared joystick state when both channels use joystick
         from holosoma_inference.inputs.joystick import JoystickOtherInput, JoystickVelocityInput
 
-        if isinstance(self._other_input, JoystickOtherInput) and isinstance(self._velocity_input, JoystickVelocityInput):
+        if isinstance(self._other_input, JoystickOtherInput) and isinstance(
+            self._velocity_input, JoystickVelocityInput
+        ):
             self._other_input._shared_velocity = self._velocity_input
 
         self._velocity_input.start()
@@ -405,13 +390,15 @@ class BasePolicy:
     def _create_other_input(self, source: InputSource):
         """Create other input provider. Override for policy-specific variants."""
         if source == InputSource.keyboard:
+            from holosoma_inference.inputs.commands import KEYBOARD_BASE
             from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
-            return KeyboardOtherInput(self)
+            return KeyboardOtherInput(self, KEYBOARD_BASE)
         if source == InputSource.joystick:
+            from holosoma_inference.inputs.commands import JOYSTICK_BASE
             from holosoma_inference.inputs.joystick import JoystickOtherInput
 
-            return JoystickOtherInput(self)
+            return JoystickOtherInput(self, JOYSTICK_BASE)
         if source == InputSource.ros2:
             from holosoma_inference.inputs.ros2 import Ros2OtherInput
 
@@ -780,19 +767,53 @@ class BasePolicy:
         self.phase = np.fmod(phase_tp1 + np.pi, 2 * np.pi) - np.pi
 
     # ============================================================================
-    # Button Handler Methods (dispatch to providers)
+    # Command Dispatch
     # ============================================================================
 
     def handle_keyboard_button(self, keycode):
-        """Dispatch keyboard input to velocity and other input providers."""
-        if not self._velocity_input.handle_key(keycode):
-            self._other_input.handle_key(keycode)
-        self._print_control_status()
+        """Dispatch keyboard input: try velocity first, then map to command."""
+        if self._velocity_input.handle_key(keycode):
+            self._print_control_status()
+            return
+        cmd = self._other_input.map_key(keycode)
+        if cmd is not None:
+            self._dispatch_command(cmd)
+            self._print_control_status()
 
-    def handle_joystick_button(self, cur_key):
-        """Dispatch joystick button to other input provider."""
-        self._other_input.handle_joystick_button(cur_key)
-        self._print_control_status()
+    def _dispatch_command(self, cmd):
+        """Dispatch a command enum to the appropriate handler.
+
+        Subclasses override this to handle policy-specific commands,
+        calling ``super()._dispatch_command(cmd)`` for unhandled ones.
+        """
+        from holosoma_inference.inputs.commands import SWITCH_POLICY_INDEX, Command
+
+        if cmd == Command.START:
+            self._handle_start_policy()
+        elif cmd == Command.STOP:
+            self._handle_stop_policy()
+        elif cmd == Command.INIT:
+            self._handle_init_state()
+        elif cmd == Command.KILL:
+            self.logger.info(colored("Killing program via command", "red"))
+            sys.exit(0)
+        elif cmd == Command.NEXT_POLICY:
+            next_index = (self.active_policy_index + 1) % len(self.model_paths)
+            self._activate_policy(next_index)
+        elif cmd in SWITCH_POLICY_INDEX:
+            index = SWITCH_POLICY_INDEX[cmd]
+            if index != self.active_policy_index and 0 <= index < len(self.model_paths):
+                self._activate_policy(index)
+        elif cmd == Command.KP_UP:
+            self.interface.kp_level += 0.1
+        elif cmd == Command.KP_DOWN:
+            self.interface.kp_level -= 0.1
+        elif cmd == Command.KP_UP_FINE:
+            self.interface.kp_level += 0.01
+        elif cmd == Command.KP_DOWN_FINE:
+            self.interface.kp_level -= 0.01
+        elif cmd == Command.KP_RESET:
+            self.interface.kp_level = 1.0
 
     # ============================================================================
     # Control Action Methods
@@ -823,32 +844,6 @@ class BasePolicy:
         if hasattr(self.interface, "no_action"):
             self.interface.no_action = 0
 
-    def _handle_kp_control(self, keycode):
-        """Handle keyboard KP control."""
-        if keycode == "v":
-            self.interface.kp_level -= 0.01
-        elif keycode == "b":
-            self.interface.kp_level += 0.01
-        elif keycode == "f":
-            self.interface.kp_level -= 0.1
-        elif keycode == "g":
-            self.interface.kp_level += 0.1
-        elif keycode == "r":
-            self.interface.kp_level = 1.0
-
-    def _handle_joystick_kp_control(self, keycode):
-        """Handle joystick KP control."""
-        if keycode == "down":
-            self.interface.kp_level -= 0.1
-        elif keycode == "up":
-            self.interface.kp_level += 0.1
-        elif keycode == "left":
-            self.interface.kp_level -= 0.01
-        elif keycode == "right":
-            self.interface.kp_level += 0.01
-        elif keycode == "F1":
-            self.interface.kp_level = 1.0
-
     def _print_control_status(self):
         """Print current control status."""
         self.logger.info("------------ Control Status ------------")
@@ -871,7 +866,9 @@ class BasePolicy:
                 self.latency_tracker.start_cycle()
 
                 self._velocity_input.poll()
-                self._other_input.poll()
+                for cmd in self._other_input.poll():
+                    self._dispatch_command(cmd)
+                    self._print_control_status()
                 if self.use_phase:
                     self.update_phase_time()
 

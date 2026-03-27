@@ -410,14 +410,24 @@ class WholeBodyTrackingPolicy(BasePolicy):
 
     def _create_other_input(self, source):
         if source == InputSource.keyboard:
-            from holosoma_inference.inputs.keyboard import WbtKeyboardOtherInput
+            from holosoma_inference.inputs.commands import KEYBOARD_WBT
+            from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
-            return WbtKeyboardOtherInput(self)
+            return KeyboardOtherInput(self, KEYBOARD_WBT)
         if source == InputSource.joystick:
-            from holosoma_inference.inputs.joystick import WbtJoystickOtherInput
+            from holosoma_inference.inputs.commands import JOYSTICK_WBT
+            from holosoma_inference.inputs.joystick import JoystickOtherInput
 
-            return WbtJoystickOtherInput(self)
+            return JoystickOtherInput(self, JOYSTICK_WBT)
         return super()._create_other_input(source)
+
+    def _dispatch_command(self, cmd):
+        from holosoma_inference.inputs.commands import WbtCommand
+
+        if cmd == WbtCommand.START_MOTION_CLIP:
+            self._handle_start_motion_clip()
+        else:
+            super()._dispatch_command(cmd)
 
     def _capture_robot_yaw_offset(self):
         """Capture robot yaw when policy starts to use as reference offset."""

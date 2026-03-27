@@ -56,14 +56,33 @@ class LocomotionPolicy(BasePolicy):
 
     def _create_other_input(self, source):
         if source == InputSource.keyboard:
-            from holosoma_inference.inputs.keyboard import LocomotionKeyboardOtherInput
+            from holosoma_inference.inputs.commands import KEYBOARD_LOCOMOTION
+            from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
-            return LocomotionKeyboardOtherInput(self)
+            return KeyboardOtherInput(self, KEYBOARD_LOCOMOTION)
         if source == InputSource.joystick:
-            from holosoma_inference.inputs.joystick import LocomotionJoystickOtherInput
+            from holosoma_inference.inputs.commands import JOYSTICK_LOCOMOTION
+            from holosoma_inference.inputs.joystick import JoystickOtherInput
 
-            return LocomotionJoystickOtherInput(self)
+            return JoystickOtherInput(self, JOYSTICK_LOCOMOTION)
         return super()._create_other_input(source)
+
+    def _dispatch_command(self, cmd):
+        from holosoma_inference.inputs.commands import LocomotionCommand
+
+        if cmd == LocomotionCommand.STAND_TOGGLE:
+            self._handle_stand_command()
+        elif cmd == LocomotionCommand.ZERO_VELOCITY:
+            self._handle_zero_velocity()
+        elif cmd == LocomotionCommand.WALK:
+            self.stand_command[0, 0] = 1
+            self.base_height_command[0, 0] = self.desired_base_height
+            self.logger.info("ROS2 command: walk")
+        elif cmd == LocomotionCommand.STAND:
+            self.stand_command[0, 0] = 0
+            self.logger.info("ROS2 command: stand")
+        else:
+            super()._dispatch_command(cmd)
 
     def _handle_velocity_control(self, keycode):
         """Handle linear velocity control."""

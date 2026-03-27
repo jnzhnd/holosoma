@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import threading
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from holosoma_inference.inputs.base import OtherInput, VelocityInput
@@ -18,8 +19,7 @@ class KeyboardListener:
     Created lazily by keyboard providers and stored on the policy as
     ``_keyboard_listener``.  Multiple providers share one instance;
     ``start()`` is idempotent.  Keypresses are dispatched through
-    ``policy.handle_keyboard_button()`` so DualMode monkey-patching
-    still works.
+    ``policy.handle_keyboard_button()``.
     """
 
     def __init__(self, policy: BasePolicy) -> None:
@@ -87,34 +87,21 @@ class KeyboardVelocityInput(VelocityInput):
 
 
 class KeyboardOtherInput(OtherInput):
-    """Keyboard handler for common discrete commands.
+    """Keyboard handler for discrete commands using a mapping dict.
 
-    Keys: ] (start), o (stop), i (init), v/b/f/g/r (kp tuning), 1-9 (switch policy).
+    Key-to-command translation is fully determined by the mapping passed
+    at construction time — no subclassing needed for policy-specific keys.
     """
+
+    def __init__(self, policy: BasePolicy, mapping: dict[str, Enum]):
+        super().__init__(policy, mapping)
 
     def start(self) -> None:
         _ensure_keyboard_listener(self.policy)
 
-    def handle_key(self, keycode: str) -> bool:
-        if self.policy._try_switch_policy_key(keycode):
-            return True
-        if keycode == "]":
-            self.policy._handle_start_policy()
-            return True
-        if keycode == "o":
-            self.policy._handle_stop_policy()
-            return True
-        if keycode == "i":
-            self.policy._handle_init_state()
-            return True
-        if keycode in ("v", "b", "f", "g", "r"):
-            self.policy._handle_kp_control(keycode)
-            return True
-        return False
-
 
 # ---------------------------------------------------------------------------
-# Locomotion-specific
+# Locomotion-specific velocity input (velocity is not enum-based)
 # ---------------------------------------------------------------------------
 
 
@@ -132,28 +119,3 @@ class LocomotionKeyboardVelocityInput(KeyboardVelocityInput):
             self.policy._handle_zero_velocity()
             return True
         return False
-
-
-class LocomotionKeyboardOtherInput(KeyboardOtherInput):
-    """Adds stand/walk toggle (=) to base keyboard commands."""
-
-    def handle_key(self, keycode: str) -> bool:
-        if keycode == "=":
-            self.policy._handle_stand_command()
-            return True
-        return super().handle_key(keycode)
-
-
-# ---------------------------------------------------------------------------
-# WBT-specific
-# ---------------------------------------------------------------------------
-
-
-class WbtKeyboardOtherInput(KeyboardOtherInput):
-    """Adds motion clip start (s) to base keyboard commands."""
-
-    def handle_key(self, keycode: str) -> bool:
-        if keycode == "s":
-            self.policy._handle_start_motion_clip()
-            return True
-        return super().handle_key(keycode)
