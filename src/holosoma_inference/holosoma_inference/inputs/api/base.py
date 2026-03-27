@@ -4,23 +4,23 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from holosoma_inference.inputs.api.commands import StateCommand, VelocityCommand
+from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 
 class VelocityInput(ABC):
     """Provides absolute velocity state each cycle.
 
     Implementations read from their device (joystick sticks, keyboard
-    increments, ROS2 topic) and return a ``VelocityCommand`` with the
-    current absolute velocity, or ``None`` if no update is available.
+    increments, ROS2 topic) and return a ``VelCmd`` with the current
+    absolute velocity, or ``None`` if no update is available.
     """
 
     @abstractmethod
     def start(self) -> None:
         """Initialize the input source (start threads, subscribe to topics, etc.)."""
 
-    def poll(self) -> VelocityCommand | None:
-        """Return current velocity, or None if this source has no update."""
+    def poll(self) -> VelCmd | None:
+        """Return current velocity, or None if no update is available."""
         return None
 
     def zero(self) -> None:

@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 from holosoma_inference.config.config_types.task import InputSource
-from holosoma_inference.inputs.api.commands import StateCommand, VelocityCommand
+from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE, JOYSTICK_LOCOMOTION, JOYSTICK_WBT
 from holosoma_inference.inputs.impl.keyboard import (
     KEYBOARD_BASE,
@@ -305,7 +305,7 @@ class TestKeyboardVelocityInput:
         prov = KeyboardVelocityInput(queue, KEYBOARD_VELOCITY_LOCOMOTION)
         queue.append("w")
         vc = prov.poll()
-        assert isinstance(vc, VelocityCommand)
+        assert isinstance(vc, VelCmd)
         assert pytest.approx(vc.lin_vel[0]) == 0.1
         assert pytest.approx(vc.lin_vel[1]) == 0.0
         assert pytest.approx(vc.ang_vel) == 0.0
@@ -397,13 +397,12 @@ class TestKeyboardVelocityInput:
 
 
 class TestJoystickVelocityInput:
-    def test_poll_skips_when_no_msg(self, policy):
+    def test_poll_returns_none_when_no_msg(self, policy):
         from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
 
         policy.interface.get_joystick_msg.return_value = None
         prov = JoystickVelocityInput(policy)
-        result = prov.poll()
-        assert result is None
+        assert prov.poll() is None
         policy.interface.process_joystick_input.assert_not_called()
 
     def test_poll_returns_velocity_command(self, policy):
@@ -418,7 +417,7 @@ class TestJoystickVelocityInput:
         prov = JoystickVelocityInput(policy)
         vc = prov.poll()
 
-        assert isinstance(vc, VelocityCommand)
+        assert isinstance(vc, VelCmd)
         assert vc.lin_vel == (0.5, 0.0)
         assert vc.ang_vel == pytest.approx(0.1)
         assert prov.key_states == {"A": True}
@@ -538,7 +537,7 @@ class TestRos2VelocityInput:
         prov._callback(msg)
         vc = prov.poll()
 
-        assert isinstance(vc, VelocityCommand)
+        assert isinstance(vc, VelCmd)
         assert vc.lin_vel == pytest.approx((0.5, -0.3))
         assert vc.ang_vel == pytest.approx(0.8)
 
@@ -1137,16 +1136,16 @@ class TestJoystickStandaloneEdgeCases:
 
 class TestVelocityCommand:
     def test_frozen(self):
-        vc = VelocityCommand((0.0, 0.0), 0.0)
+        vc = VelCmd((0.0, 0.0), 0.0)
         with pytest.raises(AttributeError):
             vc.lin_vel = (1.0, 1.0)
 
     def test_equality(self):
-        a = VelocityCommand((1.0, 2.0), 3.0)
-        b = VelocityCommand((1.0, 2.0), 3.0)
+        a = VelCmd((1.0, 2.0), 3.0)
+        b = VelCmd((1.0, 2.0), 3.0)
         assert a == b
 
     def test_fields(self):
-        vc = VelocityCommand((0.5, -0.3), 0.8)
+        vc = VelCmd((0.5, -0.3), 0.8)
         assert vc.lin_vel == (0.5, -0.3)
         assert vc.ang_vel == 0.8

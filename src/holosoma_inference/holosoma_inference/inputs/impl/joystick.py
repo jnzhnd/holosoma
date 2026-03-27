@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
-from holosoma_inference.inputs.api.commands import StateCommand, VelocityCommand
+from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
@@ -50,7 +50,7 @@ class JoystickVelocityInput(VelocityInput):
     def start(self) -> None:
         pass  # Joystick hardware initialized by SDK
 
-    def poll(self) -> VelocityCommand | None:
+    def poll(self) -> VelCmd | None:
         if self.policy.interface.get_joystick_msg() is None:
             return None
         self.last_key_states = self.key_states.copy()
@@ -60,7 +60,7 @@ class JoystickVelocityInput(VelocityInput):
             self.policy.stand_command,
             False,
         )
-        return VelocityCommand(
+        return VelCmd(
             (float(lin_vel[0, 0]), float(lin_vel[0, 1])),
             float(ang_vel[0, 0]),
         )

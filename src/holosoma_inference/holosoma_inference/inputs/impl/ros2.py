@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
-from holosoma_inference.inputs.api.commands import StateCommand, VelocityCommand
+from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
@@ -48,8 +48,8 @@ class Ros2VelocityInput(VelocityInput):
         self._lin_vel[0, 1] = max(-1.0, min(1.0, msg.twist.linear.y))
         self._ang_vel[0, 0] = max(-1.0, min(1.0, msg.twist.angular.z))
 
-    def poll(self) -> VelocityCommand:
-        return VelocityCommand(
+    def poll(self) -> VelCmd:
+        return VelCmd(
             (float(self._lin_vel[0, 0]), float(self._lin_vel[0, 1])),
             float(self._ang_vel[0, 0]),
         )

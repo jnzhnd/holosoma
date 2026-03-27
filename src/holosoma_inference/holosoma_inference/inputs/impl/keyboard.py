@@ -11,7 +11,7 @@ import numpy as np
 from sshkeyboard import listen_keyboard
 
 from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
-from holosoma_inference.inputs.api.commands import StateCommand, VelocityCommand
+from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
@@ -151,7 +151,7 @@ class KeyboardVelocityInput(VelocityInput):
     def start(self) -> None:
         pass  # Listener already started by factory
 
-    def poll(self) -> VelocityCommand | None:
+    def poll(self) -> VelCmd | None:
         if not self._velocity_keys:
             self._queue.clear()
             return None
@@ -169,7 +169,7 @@ class KeyboardVelocityInput(VelocityInput):
                 else:
                     self._ang_vel[0, col] += delta
 
-        return VelocityCommand(
+        return VelCmd(
             (float(self._lin_vel[0, 0]), float(self._lin_vel[0, 1])),
             float(self._ang_vel[0, 0]),
         )

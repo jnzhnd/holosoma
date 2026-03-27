@@ -3,7 +3,7 @@
 ``StateCommand`` enums represent discrete user *intent* (e.g. "start the
 policy") decoupled from the physical input that triggered it.
 
-``VelocityCommand`` is a value object carrying absolute velocity state
+``VelCmd`` is a value object carrying absolute velocity state
 produced by ``VelocityInput`` providers each cycle.
 
 Device-to-command mappings live in their respective impl modules
@@ -17,7 +17,7 @@ from enum import Enum, auto
 
 
 @dataclass(frozen=True)
-class VelocityCommand:
+class VelCmd:
     """Absolute velocity state emitted by VelocityInput providers."""
 
     lin_vel: tuple[float, float]  # linear x, y (m/s)
