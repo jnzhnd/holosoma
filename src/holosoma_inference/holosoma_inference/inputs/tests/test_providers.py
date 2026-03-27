@@ -751,9 +751,7 @@ class TestCreateInputFactory:
         from holosoma_inference.policies.base import BasePolicy
 
         p = self._make_policy_for_factory()
-        p.config = SimpleNamespace(
-            task=SimpleNamespace(velocity_input="interface", other_input="interface")
-        )
+        p.config = SimpleNamespace(task=SimpleNamespace(velocity_input="interface", other_input="interface"))
         BasePolicy._create_input_providers(p)
         assert p._velocity_input is p._command_provider
         assert isinstance(p._velocity_input, InterfaceInput)
@@ -763,9 +761,7 @@ class TestCreateInputFactory:
         from holosoma_inference.policies.base import BasePolicy
 
         p = self._make_policy_for_factory(monkeypatch, use_joystick=False)
-        p.config = SimpleNamespace(
-            task=SimpleNamespace(velocity_input="keyboard", other_input="keyboard")
-        )
+        p.config = SimpleNamespace(task=SimpleNamespace(velocity_input="keyboard", other_input="keyboard"))
         BasePolicy._create_input_providers(p)
         assert p._velocity_input is p._command_provider
         assert isinstance(p._velocity_input, KeyboardInput)
