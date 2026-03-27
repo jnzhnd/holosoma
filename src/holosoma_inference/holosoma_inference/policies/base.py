@@ -19,11 +19,17 @@ from termcolor import colored
 from holosoma_inference.config.config_types.inference import InferenceConfig
 from holosoma_inference.config.config_types.robot import RobotConfig
 from holosoma_inference.config.config_types.task import InputSource
+from holosoma_inference.inputs.api.commands import StateCommand
 from holosoma_inference.sdk import create_interface
 from holosoma_inference.utils.latency import LatencyTracker
 from holosoma_inference.utils.math.quat import quat_rotate_inverse
 from holosoma_inference.utils.rate import RateLimiter
 from holosoma_inference.utils.wandb import load_checkpoint
+
+# Maps SWITCH_POLICY_N commands to 0-based policy indices.
+STATE_COMMAND_TO_POLICY_INDEX: dict[StateCommand, int] = {
+    StateCommand[f"SWITCH_POLICY_{n}"]: n - 1 for n in range(1, 10)
+}
 
 
 class BasePolicy:
@@ -807,8 +813,6 @@ class BasePolicy:
         Subclasses override this to handle policy-specific commands,
         calling ``super()._dispatch_command(cmd)`` for unhandled ones.
         """
-        from holosoma_inference.inputs.api.commands import SWITCH_POLICY_INDEX, StateCommand
-
         if cmd == StateCommand.START:
             self._handle_start_policy()
         elif cmd == StateCommand.STOP:
@@ -821,8 +825,8 @@ class BasePolicy:
         elif cmd == StateCommand.NEXT_POLICY:
             next_index = (self.active_policy_index + 1) % len(self.model_paths)
             self._activate_policy(next_index)
-        elif cmd in SWITCH_POLICY_INDEX:
-            index = SWITCH_POLICY_INDEX[cmd]
+        elif cmd in STATE_COMMAND_TO_POLICY_INDEX:
+            index = STATE_COMMAND_TO_POLICY_INDEX[cmd]
             if index != self.active_policy_index and 0 <= index < len(self.model_paths):
                 self._activate_policy(index)
         elif cmd == StateCommand.KP_UP:

@@ -59,7 +59,3 @@ class StateCommand(Enum):
 
     # --- Dual mode ---
     SWITCH_MODE = auto()
-
-
-# Maps SWITCH_POLICY_N commands to 0-based policy indices.
-SWITCH_POLICY_INDEX: dict[StateCommand, int] = {StateCommand[f"SWITCH_POLICY_{n}"]: n - 1 for n in range(1, 10)}
