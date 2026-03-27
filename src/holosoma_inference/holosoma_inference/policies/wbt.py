@@ -10,8 +10,6 @@ from loguru import logger
 from termcolor import colored
 
 from holosoma_inference.config.config_types.inference import InferenceConfig
-from holosoma_inference.inputs.impl.joystick import JOYSTICK_WBT
-from holosoma_inference.inputs.impl.keyboard import KEYBOARD_WBT
 from holosoma_inference.policies import BasePolicy
 from holosoma_inference.policies.wbt_utils import MotionClockUtil, PinocchioRobot, TimestepUtil
 from holosoma_inference.utils.clock import ClockSub
@@ -27,9 +25,6 @@ from holosoma_inference.utils.math.quat import (
 
 
 class WholeBodyTrackingPolicy(BasePolicy):
-    _keyboard_command_mapping = KEYBOARD_WBT
-    _joystick_command_mapping = JOYSTICK_WBT
-
     def __init__(self, config: InferenceConfig):
         self.config = config
 

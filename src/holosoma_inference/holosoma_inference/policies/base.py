@@ -40,11 +40,6 @@ class BasePolicy:
     Supports both simulation and real robot deployment with keyboard/joystick controls.
     """
 
-    # Subclasses override these to get policy-specific key bindings.
-    # See holosoma_inference.inputs.api.commands for available mappings.
-    _keyboard_command_mapping = None  # Set lazily to avoid circular import
-    _joystick_command_mapping = None
-
     def __init__(self, config: InferenceConfig):
         """Initialize the base policy with configuration and model."""
         self.config = config
@@ -369,9 +364,6 @@ class BasePolicy:
         self._velocity_input.start()
         if self._command_provider is not self._velocity_input:
             self._command_provider.start()
-
-    # Class attributes for keyboard mappings — subclasses override these.
-    _keyboard_velocity_mapping = None
 
     def _init_ros_node(self):
         """Ensure rclpy is initialized and we have a ROS2 node."""

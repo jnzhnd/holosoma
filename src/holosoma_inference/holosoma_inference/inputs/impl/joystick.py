@@ -8,7 +8,7 @@ from holosoma_inference.inputs.api.commands import StateCommand
 # Joystick mappings
 # ---------------------------------------------------------------------------
 
-JOYSTICK_BASE: dict[str, StateCommand] = {
+JOYSTICK_COMMANDS: dict[str, StateCommand] = {
     "A": StateCommand.START,
     "B": StateCommand.STOP,
     "Y": StateCommand.INIT,
@@ -19,15 +19,7 @@ JOYSTICK_BASE: dict[str, StateCommand] = {
     "F1": StateCommand.KP_RESET,
     "select": StateCommand.NEXT_POLICY,
     "L1+R1": StateCommand.KILL,
-}
-
-JOYSTICK_LOCOMOTION: dict[str, StateCommand] = {
-    **JOYSTICK_BASE,
-    "start": StateCommand.STAND_TOGGLE,
+    "back": StateCommand.STAND_TOGGLE,
     "L2": StateCommand.ZERO_VELOCITY,
-}
-
-JOYSTICK_WBT: dict[str, StateCommand] = {
-    **JOYSTICK_BASE,
     "start": StateCommand.START_MOTION_CLIP,
 }

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 # Keyboard command mappings (discrete commands)
 # ---------------------------------------------------------------------------
 
-KEYBOARD_BASE: dict[str, StateCommand] = {
+KEYBOARD_COMMANDS: dict[str, StateCommand] = {
     "]": StateCommand.START,
     "o": StateCommand.STOP,
     "i": StateCommand.INIT,
@@ -28,18 +28,10 @@ KEYBOARD_BASE: dict[str, StateCommand] = {
     "f": StateCommand.KP_DOWN,
     "g": StateCommand.KP_UP,
     "r": StateCommand.KP_RESET,
-    **{str(n): StateCommand[f"SWITCH_POLICY_{n}"] for n in range(1, 10)},
-}
-
-KEYBOARD_LOCOMOTION: dict[str, StateCommand] = {
-    **KEYBOARD_BASE,
     "=": StateCommand.STAND_TOGGLE,
     "z": StateCommand.ZERO_VELOCITY,
-}
-
-KEYBOARD_WBT: dict[str, StateCommand] = {
-    **KEYBOARD_BASE,
     "s": StateCommand.START_MOTION_CLIP,
+    **{str(n): StateCommand[f"SWITCH_POLICY_{n}"] for n in range(1, 10)},
 }
 
 # ---------------------------------------------------------------------------
@@ -151,8 +143,22 @@ class KeyboardInput:
         self._ang_vel = np.zeros((1, 1))
         self._pending_commands: list[StateCommand] = []
 
+    @classmethod
+    def create(
+        cls,
+        policy: BasePolicy,
+        velocity_keys: dict[str, tuple[int, int, float]] | None = None,
+    ) -> KeyboardInput:
+        """Create a KeyboardInput, ensuring the shared listener exists."""
+        _ensure_keyboard_listener(policy)
+        listener = getattr(policy, "_keyboard_listener", None)
+        if listener is None and hasattr(policy, "_shared_hardware_source"):
+            listener = getattr(policy._shared_hardware_source, "_keyboard_listener", None)
+        queue = listener.subscribe() if listener else deque()
+        return cls(KEYBOARD_COMMANDS, queue, velocity_keys)
+
     def start(self) -> None:
-        pass  # Listener already started by factory
+        pass  # Listener already started by factory / create()
 
     def poll_velocity(self) -> VelCmd | None:
         has_velocity = bool(self._velocity_keys)
