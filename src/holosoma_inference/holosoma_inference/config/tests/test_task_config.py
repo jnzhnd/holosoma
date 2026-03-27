@@ -1,13 +1,13 @@
 """Unit tests for TaskConfig input source configuration.
 
-Covers the InputSource literal type, velocity_input/other_input fields,
+Covers the InputSource literal type, velocity_input/state_input fields,
 use_keyboard/use_joystick shortcut aliases, and mutual exclusion validation.
 """
 
 import pytest
 
 from holosoma_inference.config.config_types.task import (
-    DEFAULT_OTHER_INPUT,
+    DEFAULT_STATE_INPUT,
     DEFAULT_VELOCITY_INPUT,
     TaskConfig,
 )
@@ -16,12 +16,12 @@ from holosoma_inference.config.config_types.task import (
 class TestDefaults:
     def test_default_values(self):
         assert DEFAULT_VELOCITY_INPUT == "keyboard"
-        assert DEFAULT_OTHER_INPUT == "keyboard"
+        assert DEFAULT_STATE_INPUT == "keyboard"
 
     def test_default_inputs(self):
         tc = TaskConfig(model_path="test.onnx")
         assert tc.velocity_input == "keyboard"
-        assert tc.other_input == "keyboard"
+        assert tc.state_input == "keyboard"
 
     def test_shortcuts_default_false(self):
         tc = TaskConfig(model_path="test.onnx")
@@ -30,7 +30,7 @@ class TestDefaults:
 
 
 class TestExplicitInputSelection:
-    """Verify explicit velocity_input/other_input combinations."""
+    """Verify explicit velocity_input/state_input combinations."""
 
     @pytest.mark.parametrize(
         "vel, other",
@@ -47,43 +47,43 @@ class TestExplicitInputSelection:
         ],
     )
     def test_all_combinations(self, vel, other):
-        tc = TaskConfig(model_path="test.onnx", velocity_input=vel, other_input=other)
+        tc = TaskConfig(model_path="test.onnx", velocity_input=vel, state_input=other)
         assert tc.velocity_input == vel
-        assert tc.other_input == other
+        assert tc.state_input == other
 
 
 class TestUseJoystickShortcut:
     def test_sets_both_channels(self):
         tc = TaskConfig(model_path="test.onnx", use_joystick=True)
         assert tc.velocity_input == "interface"
-        assert tc.other_input == "interface"
+        assert tc.state_input == "interface"
 
     def test_conflicts_with_velocity_input(self):
         with pytest.raises(Exception, match="Cannot combine"):
             TaskConfig(model_path="test.onnx", use_joystick=True, velocity_input="ros2")
 
-    def test_conflicts_with_other_input(self):
+    def test_conflicts_with_state_input(self):
         with pytest.raises(Exception, match="Cannot combine"):
-            TaskConfig(model_path="test.onnx", use_joystick=True, other_input="ros2")
+            TaskConfig(model_path="test.onnx", use_joystick=True, state_input="ros2")
 
     def test_conflicts_with_both_inputs(self):
         with pytest.raises(Exception, match="Cannot combine"):
-            TaskConfig(model_path="test.onnx", use_joystick=True, velocity_input="ros2", other_input="ros2")
+            TaskConfig(model_path="test.onnx", use_joystick=True, velocity_input="ros2", state_input="ros2")
 
 
 class TestUseKeyboardShortcut:
     def test_sets_both_channels(self):
         tc = TaskConfig(model_path="test.onnx", use_keyboard=True)
         assert tc.velocity_input == "keyboard"
-        assert tc.other_input == "keyboard"
+        assert tc.state_input == "keyboard"
 
     def test_conflicts_with_velocity_input(self):
         with pytest.raises(Exception, match="Cannot combine"):
             TaskConfig(model_path="test.onnx", use_keyboard=True, velocity_input="ros2")
 
-    def test_conflicts_with_other_input(self):
+    def test_conflicts_with_state_input(self):
         with pytest.raises(Exception, match="Cannot combine"):
-            TaskConfig(model_path="test.onnx", use_keyboard=True, other_input="joystick")
+            TaskConfig(model_path="test.onnx", use_keyboard=True, state_input="joystick")
 
 
 class TestShortcutMutualExclusion:
@@ -98,11 +98,11 @@ class TestDefaultConfigs:
 
         for name, config in DEFAULTS.items():
             assert isinstance(config.velocity_input, str), f"{name}: velocity_input not str"
-            assert isinstance(config.other_input, str), f"{name}: other_input not str"
+            assert isinstance(config.state_input, str), f"{name}: state_input not str"
 
     def test_default_configs_use_keyboard(self):
         from holosoma_inference.config.config_values.task import DEFAULTS
 
         for name, config in DEFAULTS.items():
             assert config.velocity_input == "keyboard", f"{name}: unexpected velocity_input"
-            assert config.other_input == "keyboard", f"{name}: unexpected other_input"
+            assert config.state_input == "keyboard", f"{name}: unexpected state_input"

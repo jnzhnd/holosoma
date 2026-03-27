@@ -9,7 +9,7 @@ from pydantic.dataclasses import dataclass
 InputSource = Literal["keyboard", "interface", "joystick", "ros2"]
 
 DEFAULT_VELOCITY_INPUT: InputSource = "keyboard"
-DEFAULT_OTHER_INPUT: InputSource = "keyboard"
+DEFAULT_STATE_INPUT: InputSource = "keyboard"
 
 
 @dataclass(frozen=True)
@@ -57,14 +57,14 @@ class TaskConfig:
     velocity_input: InputSource = DEFAULT_VELOCITY_INPUT
     """Source for velocity commands."""
 
-    other_input: InputSource = DEFAULT_OTHER_INPUT
+    state_input: InputSource = DEFAULT_STATE_INPUT
     """Source for non-velocity inputs (start/stop, walk/stand, tuning)."""
 
     use_keyboard: bool = False
-    """Shortcut: set both velocity_input and other_input to "keyboard". Cannot be combined with explicit input settings."""
+    """Shortcut: set both velocity_input and state_input to "keyboard". Cannot be combined with explicit input settings."""
 
     use_joystick: bool = False
-    """Shortcut: set both velocity_input and other_input to "joystick". Cannot be combined with explicit input settings."""
+    """Shortcut: set both velocity_input and state_input to "joystick". Cannot be combined with explicit input settings."""
 
     joystick_type: str = "xbox"
     """Joystick type."""
@@ -75,8 +75,8 @@ class TaskConfig:
     ros_cmd_vel_topic: str = "cmd_vel"
     """ROS2 topic name for velocity commands (used when velocity_input is "ros2")."""
 
-    ros_other_input_topic: str = "holosoma/other_input"
-    """ROS2 topic name for discrete commands (used when other_input is "ros2")."""
+    ros_state_input_topic: str = "holosoma/state_input"
+    """ROS2 topic name for discrete commands (used when state_input is "ros2")."""
 
     use_sim_time: bool = False
     """Use synchronized simulation time for WBT policies."""
@@ -107,11 +107,11 @@ class TaskConfig:
     """Debug overrides for quick testing."""
 
     def __post_init__(self):
-        """Resolve use_keyboard/use_joystick shortcuts into velocity_input/other_input."""
+        """Resolve use_keyboard/use_joystick shortcuts into velocity_input/state_input."""
         if self.use_keyboard and self.use_joystick:
             raise ValueError(
                 "Cannot combine --task.use-keyboard with --task.use-joystick. "
-                "Use one shortcut or set --task.velocity-input and --task.other-input individually."
+                "Use one shortcut or set --task.velocity-input and --task.state-input individually."
             )
 
         shortcut: InputSource | None = None
@@ -121,12 +121,12 @@ class TaskConfig:
             shortcut = "keyboard"
 
         if shortcut is not None:
-            has_custom_input = self.velocity_input != DEFAULT_VELOCITY_INPUT or self.other_input != DEFAULT_OTHER_INPUT
+            has_custom_input = self.velocity_input != DEFAULT_VELOCITY_INPUT or self.state_input != DEFAULT_STATE_INPUT
             if has_custom_input:
                 raise ValueError(
                     f"Cannot combine --task.use-{shortcut} with --task.velocity-input or "
-                    "--task.other-input. Use either the shortcut flag or the individual "
+                    "--task.state-input. Use either the shortcut flag or the individual "
                     "input settings, not both."
                 )
             object.__setattr__(self, "velocity_input", shortcut)
-            object.__setattr__(self, "other_input", shortcut)
+            object.__setattr__(self, "state_input", shortcut)

@@ -146,7 +146,7 @@ class BasePolicy:
             return
         # Derive use_joystick for SDK: True if interface/joystick is used for either channel
         vel = self.config.task.velocity_input
-        other = self.config.task.other_input
+        other = self.config.task.state_input
         need_joystick = bool({"interface", "joystick"} & {vel, other})
         self.interface = create_interface(
             self.robot_config,
@@ -323,7 +323,7 @@ class BasePolicy:
         then providers are created via factory methods (overridden by subclasses).
         """
         vel = self.config.task.velocity_input
-        other = self.config.task.other_input
+        other = self.config.task.state_input
         sources = {vel, other}
 
         # Joystick hardware (needed if either channel uses interface or joystick)
@@ -355,10 +355,10 @@ class BasePolicy:
         """
         self._velocity_input = create_input(self, self.config.task.velocity_input, "velocity")
 
-        if self.config.task.velocity_input == self.config.task.other_input:
+        if self.config.task.velocity_input == self.config.task.state_input:
             self._command_provider = self._velocity_input
         else:
-            self._command_provider = create_input(self, self.config.task.other_input, "command")
+            self._command_provider = create_input(self, self.config.task.state_input, "command")
 
         self._velocity_input.start()
         if self._command_provider is not self._velocity_input:

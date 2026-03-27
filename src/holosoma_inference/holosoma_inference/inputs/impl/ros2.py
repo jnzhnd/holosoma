@@ -73,9 +73,9 @@ class Ros2StateCommandProvider:
         self.policy._init_ros_node()
         from std_msgs.msg import String
 
-        topic = self.policy.config.task.ros_other_input_topic
+        topic = self.policy.config.task.ros_state_input_topic
         self.policy.node.create_subscription(String, topic, self._callback, 10)
-        self.policy.logger.info(f"Subscribed to ROS2 other_input topic: {topic}")
+        self.policy.logger.info(f"Subscribed to ROS2 state_input topic: {topic}")
 
     def _callback(self, msg):
         """Map ROS2 string command to enum and queue it."""
