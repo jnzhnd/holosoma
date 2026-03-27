@@ -400,9 +400,11 @@ class BasePolicy:
         """
         if source == InputSource.keyboard:
             from holosoma_inference.inputs.commands import KEYBOARD_BASE
-            from holosoma_inference.inputs.keyboard import KeyboardOtherInput
+            from holosoma_inference.inputs.keyboard import KeyboardOtherInput, _ensure_keyboard_listener
 
-            return KeyboardOtherInput(self, self._keyboard_command_mapping or KEYBOARD_BASE)
+            _ensure_keyboard_listener(self)
+            mapping = self._keyboard_command_mapping or KEYBOARD_BASE
+            return KeyboardOtherInput(mapping, self._get_keyboard_queue())
         if source == InputSource.joystick:
             from holosoma_inference.inputs.commands import JOYSTICK_BASE
             from holosoma_inference.inputs.joystick import JoystickOtherInput
@@ -413,6 +415,15 @@ class BasePolicy:
 
             return Ros2OtherInput(self)
         raise ValueError(f"Unknown other input source: {source}")
+
+    def _get_keyboard_queue(self):
+        """Get the keyboard listener queue, checking shared hardware source if needed."""
+        listener = getattr(self, "_keyboard_listener", None)
+        if listener is None and hasattr(self, "_shared_hardware_source"):
+            listener = getattr(self._shared_hardware_source, "_keyboard_listener", None)
+        if listener is not None:
+            return listener._queue
+        return deque()
 
     def _init_ros_node(self):
         """Ensure rclpy is initialized and we have a ROS2 node."""

@@ -44,13 +44,11 @@ class JoystickOtherInput(OtherInput):
     """
 
     def __init__(self, policy: BasePolicy, mapping: dict[str, Enum]):
-        super().__init__(policy, mapping)
+        super().__init__(mapping)
+        self.policy = policy
         self._shared_velocity: JoystickVelocityInput | None = None
         self._key_states: dict[str, bool] = {}
         self._last_key_states: dict[str, bool] = {}
-
-    def start(self) -> None:
-        pass
 
     def poll(self) -> list[Enum]:
         if self._shared_velocity is not None:

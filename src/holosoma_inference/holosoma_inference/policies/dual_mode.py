@@ -75,26 +75,17 @@ class DualModePolicy:
     def _setup_command_intercept(self):
         """Inject SWITCH_MODE into mappings and patch dispatch for routing.
 
-        The keyboard listener queues keycodes on the primary policy's
-        ``KeyboardListener``.  The run loop drains via the active policy's
-        ``_other_input.poll()``, so we wire the secondary's keyboard queue
-        to the primary's listener.  Only ``_dispatch_command`` needs patching
-        to intercept SWITCH_MODE.
+        Keyboard queue wiring is handled by the factory — the secondary's
+        ``KeyboardOtherInput`` already shares the primary's listener queue
+        via ``_get_keyboard_queue()`` + ``_shared_hardware_source``.
+        Only ``_dispatch_command`` needs patching to intercept SWITCH_MODE.
         """
         from holosoma_inference.inputs.commands import DualModeCommand
-        from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
         # Inject the switch-mode key into both policies' other_input mappings
         for p in (self.primary, self.secondary):
             p._other_input._mapping["X"] = DualModeCommand.SWITCH_MODE
             p._other_input._mapping["x"] = DualModeCommand.SWITCH_MODE
-
-        # Wire the secondary's keyboard queue to the primary's listener
-        # so the active policy can drain keycodes regardless of which one is active.
-        if isinstance(self.secondary._other_input, KeyboardOtherInput):
-            listener = getattr(self.primary, "_keyboard_listener", None)
-            if listener is not None:
-                self.secondary._other_input._queue = listener._queue
 
         # Patch _dispatch_command to intercept SWITCH_MODE
         self._orig_dispatch = {

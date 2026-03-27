@@ -196,7 +196,6 @@ class TestKeyboardListener:
     def test_provider_start_calls_ensure(self, monkeypatch):
         from holosoma_inference.inputs.keyboard import (
             KeyboardListener,
-            KeyboardOtherInput,
             KeyboardVelocityInput,
         )
 
@@ -206,43 +205,40 @@ class TestKeyboardListener:
         monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
         vel = KeyboardVelocityInput(p)
-        other = KeyboardOtherInput(p, KEYBOARD_BASE)
         vel.start()
-        other.start()
 
         assert isinstance(p._keyboard_listener, KeyboardListener)
         assert p._keyboard_listener._started is True
 
 
 class TestKeyboardOtherInput:
-    def _make_provider(self, policy, mapping=None):
+    def _make_provider(self, mapping=None):
         from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
-        prov = KeyboardOtherInput(policy, mapping or KEYBOARD_BASE)
-        # Wire a queue directly (simulating what start() does with a listener)
-        prov._queue = deque()
+        queue = deque()
+        prov = KeyboardOtherInput(mapping or KEYBOARD_BASE, queue)
         return prov
 
-    def test_poll_returns_mapped_commands(self, policy):
-        prov = self._make_provider(policy)
+    def test_poll_returns_mapped_commands(self):
+        prov = self._make_provider()
         prov._queue.extend(["]", "o", "i"])
         commands = prov.poll()
         assert commands == [Command.START, Command.STOP, Command.INIT]
 
-    def test_poll_skips_unmapped_keys(self, policy):
-        prov = self._make_provider(policy)
+    def test_poll_skips_unmapped_keys(self):
+        prov = self._make_provider()
         prov._queue.extend(["x", "unknown", "]"])
         commands = prov.poll()
         assert commands == [Command.START]
 
-    def test_poll_drains_queue(self, policy):
-        prov = self._make_provider(policy)
+    def test_poll_drains_queue(self):
+        prov = self._make_provider()
         prov._queue.append("]")
         assert prov.poll() == [Command.START]
         assert prov.poll() == []  # second poll is empty
 
-    def test_poll_kp_commands(self, policy):
-        prov = self._make_provider(policy)
+    def test_poll_kp_commands(self):
+        prov = self._make_provider()
         prov._queue.extend(["v", "b", "f", "g", "r"])
         commands = prov.poll()
         assert commands == [
@@ -253,21 +249,18 @@ class TestKeyboardOtherInput:
             Command.KP_RESET,
         ]
 
-    def test_poll_switch_policy(self, policy):
-        prov = self._make_provider(policy)
+    def test_poll_switch_policy(self):
+        prov = self._make_provider()
         prov._queue.append("2")
         commands = prov.poll()
         assert commands == [Command.SWITCH_POLICY_2]
 
-    def test_poll_returns_empty_when_no_queue(self, policy):
-        from holosoma_inference.inputs.keyboard import KeyboardOtherInput
-
-        prov = KeyboardOtherInput(policy, KEYBOARD_BASE)
-        # _queue is None (not started)
+    def test_poll_empty_queue_returns_empty(self):
+        prov = self._make_provider()
         assert prov.poll() == []
 
-    def test_locomotion_mapping(self, policy):
-        prov = self._make_provider(policy, KEYBOARD_LOCOMOTION)
+    def test_locomotion_mapping(self):
+        prov = self._make_provider(KEYBOARD_LOCOMOTION)
         prov._queue.extend(["=", "]", "w", "q"])
         commands = prov.poll()
         assert commands == [
@@ -277,25 +270,23 @@ class TestKeyboardOtherInput:
             LocomotionCommand.ANG_VEL_LEFT,
         ]
 
-    def test_wbt_mapping(self, policy):
-        prov = self._make_provider(policy, KEYBOARD_WBT)
+    def test_wbt_mapping(self):
+        prov = self._make_provider(KEYBOARD_WBT)
         prov._queue.extend(["s", "o"])
         commands = prov.poll()
         assert commands == [WbtCommand.START_MOTION_CLIP, Command.STOP]
 
-    def test_start_wires_queue_from_listener(self, monkeypatch):
+    def test_shared_queue_between_instances(self):
+        """Two KeyboardOtherInput instances sharing a queue: one drains, other sees empty."""
         from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
-        p = _make_policy()
-        del p._shared_hardware_source
-        del p._keyboard_listener
-        monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+        shared_queue = deque()
+        prov1 = KeyboardOtherInput(KEYBOARD_BASE, shared_queue)
+        prov2 = KeyboardOtherInput(KEYBOARD_BASE, shared_queue)
 
-        prov = KeyboardOtherInput(p, KEYBOARD_BASE)
-        prov.start()
-
-        # Queue should be wired to the listener's queue
-        assert prov._queue is p._keyboard_listener._queue
+        shared_queue.append("]")
+        assert prov1.poll() == [Command.START]
+        assert prov2.poll() == []  # already drained
 
 
 # ============================================================================
@@ -546,10 +537,15 @@ _skip_policies = pytest.mark.skipif(not _has_policies, reason="Policy deps not i
 class TestBasePolicyFactory:
     """Test BasePolicy._create_velocity_input and _create_other_input."""
 
-    def _make_base(self):
+    def _make_base(self, monkeypatch=None):
         from holosoma_inference.policies.base import BasePolicy
 
-        return BasePolicy.__new__(BasePolicy)
+        bp = BasePolicy.__new__(BasePolicy)
+        # Keyboard factory calls _ensure_keyboard_listener which needs logger
+        if monkeypatch is not None:
+            bp.logger = MagicMock()
+            monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+        return bp
 
     def test_keyboard_velocity(self):
         from holosoma_inference.inputs.keyboard import KeyboardVelocityInput
@@ -572,13 +568,14 @@ class TestBasePolicyFactory:
         result = bp._create_velocity_input(InputSource.ros2)
         assert isinstance(result, Ros2VelocityInput)
 
-    def test_keyboard_other(self):
+    def test_keyboard_other(self, monkeypatch):
         from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
-        bp = self._make_base()
+        bp = self._make_base(monkeypatch)
         result = bp._create_other_input(InputSource.keyboard)
         assert isinstance(result, KeyboardOtherInput)
         assert result._mapping is KEYBOARD_BASE
+        assert result._queue is bp._keyboard_listener._queue
 
     def test_joystick_other(self):
         from holosoma_inference.inputs.joystick import JoystickOtherInput
@@ -595,8 +592,8 @@ class TestBasePolicyFactory:
         result = bp._create_other_input(InputSource.ros2)
         assert isinstance(result, Ros2OtherInput)
 
-    def test_unknown_source_raises(self):
-        bp = self._make_base()
+    def test_unknown_source_raises(self, monkeypatch):
+        bp = self._make_base(monkeypatch)
         with pytest.raises(ValueError, match="Unknown velocity"):
             bp._create_velocity_input("invalid")
         with pytest.raises(ValueError, match="Unknown other"):
@@ -607,10 +604,14 @@ class TestBasePolicyFactory:
 class TestLocomotionPolicyFactory:
     """Test LocomotionPolicy overrides for keyboard/joystick providers."""
 
-    def _make_loco(self):
+    def _make_loco(self, monkeypatch=None):
         from holosoma_inference.policies.locomotion import LocomotionPolicy
 
-        return LocomotionPolicy.__new__(LocomotionPolicy)
+        lp = LocomotionPolicy.__new__(LocomotionPolicy)
+        if monkeypatch is not None:
+            lp.logger = MagicMock()
+            monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+        return lp
 
     def test_keyboard_velocity_is_base(self):
         """Locomotion no longer needs a custom velocity input — velocity keys are command enums."""
@@ -620,10 +621,10 @@ class TestLocomotionPolicyFactory:
         result = lp._create_velocity_input(InputSource.keyboard)
         assert type(result) is KeyboardVelocityInput
 
-    def test_keyboard_other_uses_locomotion_mapping(self):
+    def test_keyboard_other_uses_locomotion_mapping(self, monkeypatch):
         from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
-        lp = self._make_loco()
+        lp = self._make_loco(monkeypatch)
         result = lp._create_other_input(InputSource.keyboard)
         assert isinstance(result, KeyboardOtherInput)
         assert result._mapping is KEYBOARD_LOCOMOTION
@@ -655,15 +656,19 @@ class TestLocomotionPolicyFactory:
 class TestWbtPolicyFactory:
     """Test WholeBodyTrackingPolicy overrides for keyboard/joystick providers."""
 
-    def _make_wbt(self):
+    def _make_wbt(self, monkeypatch=None):
         from holosoma_inference.policies.wbt import WholeBodyTrackingPolicy
 
-        return WholeBodyTrackingPolicy.__new__(WholeBodyTrackingPolicy)
+        wp = WholeBodyTrackingPolicy.__new__(WholeBodyTrackingPolicy)
+        if monkeypatch is not None:
+            wp.logger = MagicMock()
+            monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+        return wp
 
-    def test_keyboard_other_uses_wbt_mapping(self):
+    def test_keyboard_other_uses_wbt_mapping(self, monkeypatch):
         from holosoma_inference.inputs.keyboard import KeyboardOtherInput
 
-        wp = self._make_wbt()
+        wp = self._make_wbt(monkeypatch)
         result = wp._create_other_input(InputSource.keyboard)
         assert isinstance(result, KeyboardOtherInput)
         assert result._mapping is KEYBOARD_WBT
@@ -797,9 +802,10 @@ class TestDualModeSwitching:
 
 @_skip_dual_mode
 class TestDualModeKeyboardQueueWiring:
-    """Test that DualMode wires the secondary's keyboard queue to the primary's listener."""
+    """Test that both policies share the same keyboard queue via DI."""
 
-    def test_keyboard_queue_wired_to_secondary(self):
+    def test_shared_queue_via_factory(self):
+        """Both policies' KeyboardOtherInput share the same listener queue."""
         from holosoma_inference.inputs.keyboard import KeyboardListener, KeyboardOtherInput
         from holosoma_inference.policies.dual_mode import DualModePolicy
 
@@ -812,22 +818,20 @@ class TestDualModeKeyboardQueueWiring:
         dual.primary._velocity_input = MagicMock()
         dual.secondary._velocity_input = MagicMock()
 
-        # Primary has a keyboard listener and keyboard other input
+        # Simulate what the factory does: both get the same queue
         listener = KeyboardListener(dual.primary)
+        shared_queue = listener._queue
         dual.primary._keyboard_listener = listener
-        dual.primary._other_input = KeyboardOtherInput(dual.primary, dict(KEYBOARD_BASE))
-        dual.primary._other_input._queue = listener._queue
-
-        # Secondary has keyboard other input but no listener (shared hardware)
-        dual.secondary._other_input = KeyboardOtherInput(dual.secondary, dict(KEYBOARD_BASE))
+        dual.primary._other_input = KeyboardOtherInput(dict(KEYBOARD_BASE), shared_queue)
+        dual.secondary._other_input = KeyboardOtherInput(dict(KEYBOARD_BASE), shared_queue)
 
         dual.primary._dispatch_command = MagicMock()
         dual.secondary._dispatch_command = MagicMock()
 
         dual._setup_command_intercept()
 
-        # Secondary's queue should now be wired to the primary's listener
-        assert dual.secondary._other_input._queue is listener._queue
+        # Both share the same queue
+        assert dual.primary._other_input._queue is dual.secondary._other_input._queue
 
     def test_keyboard_commands_reach_active_via_poll(self):
         from holosoma_inference.inputs.keyboard import KeyboardListener, KeyboardOtherInput
@@ -843,11 +847,10 @@ class TestDualModeKeyboardQueueWiring:
         dual.secondary._velocity_input = MagicMock()
 
         listener = KeyboardListener(dual.primary)
+        shared_queue = listener._queue
         dual.primary._keyboard_listener = listener
-        dual.primary._other_input = KeyboardOtherInput(dual.primary, dict(KEYBOARD_BASE))
-        dual.primary._other_input._queue = listener._queue
-
-        dual.secondary._other_input = KeyboardOtherInput(dual.secondary, dict(KEYBOARD_BASE))
+        dual.primary._other_input = KeyboardOtherInput(dict(KEYBOARD_BASE), shared_queue)
+        dual.secondary._other_input = KeyboardOtherInput(dict(KEYBOARD_BASE), shared_queue)
 
         dual.primary._dispatch_command = MagicMock()
         dual.secondary._dispatch_command = MagicMock()

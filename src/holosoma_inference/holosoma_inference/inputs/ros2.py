@@ -39,7 +39,8 @@ class Ros2OtherInput(OtherInput):
     """
 
     def __init__(self, policy: BasePolicy):
-        super().__init__(policy, {})  # ROS2 uses its own string-to-command map
+        super().__init__({})  # ROS2 uses its own string-to-command map
+        self.policy = policy
         self._queue: deque[Enum] = deque()
 
     def start(self) -> None:

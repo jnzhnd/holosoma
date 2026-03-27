@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 from holosoma_inference.inputs.base import OtherInput, VelocityInput
 
 if TYPE_CHECKING:
+    from enum import Enum
+
     from holosoma_inference.policies.base import BasePolicy
 
 
@@ -94,19 +96,11 @@ class KeyboardOtherInput(OtherInput):
     resulting command enums — same pull pattern as joystick.
     """
 
-    def __init__(self, policy: BasePolicy, mapping: dict) -> None:
-        super().__init__(policy, mapping)
-        self._queue: deque[str] | None = None
-
-    def start(self) -> None:
-        _ensure_keyboard_listener(self.policy)
-        listener = getattr(self.policy, "_keyboard_listener", None)
-        if listener is not None:
-            self._queue = listener._queue
+    def __init__(self, mapping: dict[str, Enum], queue: deque[str]) -> None:
+        super().__init__(mapping)
+        self._queue = queue
 
     def poll(self) -> list:
-        if self._queue is None:
-            return []
         commands = []
         while True:
             try:

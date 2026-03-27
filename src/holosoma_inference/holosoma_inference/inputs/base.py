@@ -36,13 +36,11 @@ class OtherInput(ABC):
     The policy dispatches these commands via ``_dispatch_command()``.
     """
 
-    def __init__(self, policy: BasePolicy, mapping: dict[str, Enum]):
-        self.policy = policy
+    def __init__(self, mapping: dict[str, Enum]):
         self._mapping = mapping
 
-    @abstractmethod
     def start(self) -> None:
-        """Initialize the input source."""
+        """Initialize the input source. Override if needed."""
 
     def poll(self) -> list[Enum]:
         """Return all commands detected this cycle."""
