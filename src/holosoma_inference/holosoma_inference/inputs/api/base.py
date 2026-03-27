@@ -1,46 +1,47 @@
-"""Abstract base classes for input providers."""
+"""Protocols for input providers.
+
+Devices implement one or both protocols:
+
+- :class:`VelCmdProvider` — continuous velocity (joystick sticks, keyboard WASD, ROS2 twist)
+- :class:`StateCommandProvider` — discrete commands (joystick buttons, keyboard keys, ROS2 strings)
+
+A device that provides both (e.g. the SDK wireless controller) implements
+both protocols in a single class.  The policy assigns the same object to
+its velocity and command slots — no shared-state wiring needed.
+"""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol, runtime_checkable
 
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 
-class VelCmdProvider(ABC):
-    """Provides absolute velocity state each cycle.
+@runtime_checkable
+class VelCmdProvider(Protocol):
+    """Provides absolute velocity state each cycle."""
 
-    Implementations read from their device (joystick sticks, keyboard
-    increments, ROS2 topic) and return a ``VelCmd`` with the current
-    absolute velocity, or ``None`` if no update is available.
-    """
-
-    @abstractmethod
     def start(self) -> None:
         """Initialize the input source (start threads, subscribe to topics, etc.)."""
+        ...
 
-    def poll(self) -> VelCmd | None:
+    def poll_velocity(self) -> VelCmd | None:
         """Return current velocity, or None if no update is available."""
-        return None
+        ...
 
     def zero(self) -> None:
-        """Reset internal velocity state to zero. Override for stateful sources (keyboard)."""
+        """Reset internal velocity state to zero."""
+        ...
 
 
-class StateCommandProvider(ABC):
-    """Provides discrete state commands each cycle.
-
-    Implementations read from their device (keyboard keys, joystick buttons,
-    ROS2 topic) and return a list of ``StateCommand`` enums representing
-    user intent.
-    """
-
-    def __init__(self, mapping: dict[str, StateCommand]) -> None:
-        self._mapping = mapping
+@runtime_checkable
+class StateCommandProvider(Protocol):
+    """Provides discrete state commands each cycle."""
 
     def start(self) -> None:
         """Initialize the input source."""
+        ...
 
-    def poll(self) -> list[StateCommand]:
+    def poll_commands(self) -> list[StateCommand]:
         """Return commands accumulated since last poll."""
-        return []
+        ...

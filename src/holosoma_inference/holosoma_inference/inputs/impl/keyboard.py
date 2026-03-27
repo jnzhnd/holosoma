@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 from sshkeyboard import listen_keyboard
 
-from holosoma_inference.inputs.api.base import StateCommandProvider, VelCmdProvider
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 if TYPE_CHECKING:
@@ -128,39 +127,42 @@ def _ensure_keyboard_listener(policy: BasePolicy) -> None:
     policy._keyboard_listener.start()
 
 
-class KeyboardVelCmdProvider(VelCmdProvider):
-    """Tracks keyboard velocity increments and returns absolute velocity.
+class KeyboardInput:
+    """Unified keyboard device implementing both velocity and command protocols.
 
-    Subscribes to its own keyboard queue. Maps velocity keycodes (WASD/QE)
-    to increments on internal lin_vel/ang_vel state. Returns a
-    ``VelocityCommand`` with current absolute values each cycle.
+    Subscribes to a single keyboard queue. ``poll_velocity()`` drains the queue,
+    applies velocity key increments, and buffers any command matches.
+    ``poll_commands()`` returns the buffered commands.
 
-    If no velocity_keys mapping is provided, always returns None (no-op).
+    If no velocity_keys mapping is provided, ``poll_velocity()`` returns None
+    but still drains the queue and buffers commands.
     """
 
     def __init__(
         self,
+        mapping: dict[str, StateCommand],
         queue: deque[str],
         velocity_keys: dict[str, tuple[int, int, float]] | None = None,
     ) -> None:
+        self._mapping = mapping
         self._queue = queue
         self._velocity_keys = velocity_keys or {}
         self._lin_vel = np.zeros((1, 2))
         self._ang_vel = np.zeros((1, 1))
+        self._pending_commands: list[StateCommand] = []
 
     def start(self) -> None:
         pass  # Listener already started by factory
 
-    def poll(self) -> VelCmd | None:
-        if not self._velocity_keys:
-            self._queue.clear()
-            return None
+    def poll_velocity(self) -> VelCmd | None:
+        has_velocity = bool(self._velocity_keys)
 
         while True:
             try:
                 keycode = self._queue.popleft()
             except IndexError:
                 break
+            # Try velocity first
             action = self._velocity_keys.get(keycode)
             if action is not None:
                 array_idx, col, delta = action
@@ -168,6 +170,14 @@ class KeyboardVelCmdProvider(VelCmdProvider):
                     self._lin_vel[0, col] += delta
                 else:
                     self._ang_vel[0, col] += delta
+                continue
+            # Try command
+            cmd = self._mapping.get(keycode)
+            if cmd is not None:
+                self._pending_commands.append(cmd)
+
+        if not has_velocity:
+            return None
 
         return VelCmd(
             (float(self._lin_vel[0, 0]), float(self._lin_vel[0, 1])),
@@ -179,27 +189,7 @@ class KeyboardVelCmdProvider(VelCmdProvider):
         self._lin_vel[:] = 0.0
         self._ang_vel[:] = 0.0
 
-
-class KeyboardStateCommandProvider(StateCommandProvider):
-    """Keyboard handler for discrete commands using a mapping dict.
-
-    Subscribes to its own keyboard queue. ``poll()`` drains the queue,
-    maps each keycode via the mapping dict, and returns the resulting
-    command enums — same pull pattern as joystick.
-    """
-
-    def __init__(self, mapping: dict[str, StateCommand], queue: deque[str]) -> None:
-        super().__init__(mapping)
-        self._queue = queue
-
-    def poll(self) -> list[StateCommand]:
-        commands: list[StateCommand] = []
-        while True:
-            try:
-                keycode = self._queue.popleft()
-            except IndexError:
-                break
-            cmd = self._mapping.get(keycode)
-            if cmd is not None:
-                commands.append(cmd)
+    def poll_commands(self) -> list[StateCommand]:
+        commands = self._pending_commands
+        self._pending_commands = []
         return commands

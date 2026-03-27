@@ -129,9 +129,7 @@ class TaskConfig:
             shortcut = InputSource.keyboard
 
         if shortcut is not None:
-            has_custom_input = (
-                self.velocity_input != DEFAULT_VELOCITY_INPUT or self.other_input != DEFAULT_OTHER_INPUT
-            )
+            has_custom_input = self.velocity_input != DEFAULT_VELOCITY_INPUT or self.other_input != DEFAULT_OTHER_INPUT
             if has_custom_input:
                 raise ValueError(
                     f"Cannot combine --task.use-{shortcut.value} with --task.velocity-input or "

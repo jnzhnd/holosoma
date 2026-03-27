@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from holosoma_inference.inputs.api.base import StateCommandProvider, VelCmdProvider
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 if TYPE_CHECKING:
@@ -26,7 +25,7 @@ ROS2_COMMAND_MAP: dict[str, StateCommand] = {
 }
 
 
-class Ros2VelCmdProvider(VelCmdProvider):
+class Ros2VelCmdProvider:
     """Subscribes to ROS2 TwistStamped topic for velocity commands."""
 
     def __init__(self, policy: BasePolicy):
@@ -48,22 +47,25 @@ class Ros2VelCmdProvider(VelCmdProvider):
         self._lin_vel[0, 1] = max(-1.0, min(1.0, msg.twist.linear.y))
         self._ang_vel[0, 0] = max(-1.0, min(1.0, msg.twist.angular.z))
 
-    def poll(self) -> VelCmd:
+    def zero(self) -> None:
+        self._lin_vel[:] = 0.0
+        self._ang_vel[:] = 0.0
+
+    def poll_velocity(self) -> VelCmd:
         return VelCmd(
             (float(self._lin_vel[0, 0]), float(self._lin_vel[0, 1])),
             float(self._ang_vel[0, 0]),
         )
 
 
-class Ros2StateCommandProvider(StateCommandProvider):
+class Ros2StateCommandProvider:
     """Subscribes to ROS2 String topic for discrete commands.
 
     Incoming string commands are mapped to enum values via ``ROS2_COMMAND_MAP``
-    and queued.  The main loop drains them via ``poll()``.
+    and queued.  The main loop drains them via ``poll_commands()``.
     """
 
     def __init__(self, policy: BasePolicy):
-        super().__init__({})  # ROS2 uses its own string-to-command map
         self.policy = policy
         self._queue: deque[StateCommand] = deque()
 
@@ -84,7 +86,7 @@ class Ros2StateCommandProvider(StateCommandProvider):
         else:
             self.policy.logger.warning(f"ROS2 command: unknown command '{cmd_str}'")
 
-    def poll(self) -> list[StateCommand]:
+    def poll_commands(self) -> list[StateCommand]:
         """Drain all queued commands."""
         commands: list[StateCommand] = []
         while True:

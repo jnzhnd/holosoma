@@ -357,6 +357,9 @@ class BasePolicy:
 
         Called after hardware init. Subclasses override _create_velocity_input
         and _create_command_provider for policy-specific provider variants.
+
+        When both channels use the same interface source, a single
+        ``InterfaceInput`` object is shared between both slots.
         """
         vel = self.config.task.velocity_input
         other = self.config.task.other_input
@@ -374,22 +377,47 @@ class BasePolicy:
 
             _ensure_keyboard_listener(self)
 
-        self._velocity_input = self._create_velocity_input(vel)
-        self._command_provider = self._create_command_provider(other)
+        # When both channels use the same device type, share a single object
+        both_interface = (
+            vel in (InputSource.interface, InputSource.joystick)
+            and other in (InputSource.interface, InputSource.joystick)
+        )
+        both_keyboard = vel == InputSource.keyboard and other == InputSource.keyboard
 
-        # Wire shared joystick state when both channels use joystick
-        from holosoma_inference.inputs.impl.interface import InterfaceStateCommandProvider, InterfaceVelCmdProvider
-
-        if isinstance(self._command_provider, InterfaceStateCommandProvider) and isinstance(
-            self._velocity_input, InterfaceVelCmdProvider
-        ):
-            self._command_provider._shared_velocity = self._velocity_input
+        if both_interface:
+            device = self._create_interface_input()
+            self._velocity_input = device
+            self._command_provider = device
+        elif both_keyboard:
+            device = self._create_keyboard_input()
+            self._velocity_input = device
+            self._command_provider = device
+        else:
+            self._velocity_input = self._create_velocity_input(vel)
+            self._command_provider = self._create_command_provider(other)
 
         self._velocity_input.start()
-        self._command_provider.start()
+        if self._command_provider is not self._velocity_input:
+            self._command_provider.start()
 
     # Class attributes for keyboard mappings — subclasses override these.
     _keyboard_velocity_mapping = None
+
+    def _create_interface_input(self):
+        """Create a shared InterfaceInput for both velocity and commands."""
+        from holosoma_inference.inputs.impl.interface import InterfaceInput
+        from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE
+
+        return InterfaceInput(self.interface, self._joystick_command_mapping or JOYSTICK_BASE)
+
+    def _create_keyboard_input(self):
+        """Create a shared KeyboardInput for both velocity and commands."""
+        from holosoma_inference.inputs.impl.keyboard import KEYBOARD_BASE, KeyboardInput
+
+        listener = self._get_keyboard_listener()
+        queue = listener.subscribe() if listener else deque()
+        mapping = self._keyboard_command_mapping or KEYBOARD_BASE
+        return KeyboardInput(mapping, queue, self._keyboard_velocity_mapping)
 
     def _create_velocity_input(self, source: InputSource):
         """Create velocity input provider.
@@ -397,15 +425,9 @@ class BasePolicy:
         Uses ``_keyboard_velocity_mapping`` class attribute for keyboard.
         """
         if source == InputSource.keyboard:
-            from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
-
-            listener = self._get_keyboard_listener()
-            queue = listener.subscribe() if listener else deque()
-            return KeyboardVelCmdProvider(queue, self._keyboard_velocity_mapping)
+            return self._create_keyboard_input()
         if source in (InputSource.interface, InputSource.joystick):
-            from holosoma_inference.inputs.impl.interface import InterfaceVelCmdProvider
-
-            return InterfaceVelCmdProvider(self.interface)
+            return self._create_interface_input()
         if source == InputSource.ros2:
             from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
@@ -419,17 +441,9 @@ class BasePolicy:
         class attributes — subclasses just override those instead of this method.
         """
         if source == InputSource.keyboard:
-            from holosoma_inference.inputs.impl.keyboard import KEYBOARD_BASE, KeyboardStateCommandProvider
-
-            listener = self._get_keyboard_listener()
-            queue = listener.subscribe() if listener else deque()
-            mapping = self._keyboard_command_mapping or KEYBOARD_BASE
-            return KeyboardStateCommandProvider(mapping, queue)
+            return self._create_keyboard_input()
         if source in (InputSource.interface, InputSource.joystick):
-            from holosoma_inference.inputs.impl.interface import InterfaceStateCommandProvider
-            from holosoma_inference.inputs.impl.joystick import JOYSTICK_BASE
-
-            return InterfaceStateCommandProvider(self.interface, self._joystick_command_mapping or JOYSTICK_BASE)
+            return self._create_interface_input()
         if source == InputSource.ros2:
             from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
@@ -904,10 +918,10 @@ class BasePolicy:
             for it in itertools.count():
                 self.latency_tracker.start_cycle()
 
-                vc = self._velocity_input.poll()
+                vc = self._velocity_input.poll_velocity()
                 if vc is not None:
                     self._apply_velocity(vc)
-                for cmd in self._command_provider.poll():
+                for cmd in self._command_provider.poll_commands():
                     self._dispatch_command(cmd)
                     self._print_control_status()
                 if self.use_phase:
