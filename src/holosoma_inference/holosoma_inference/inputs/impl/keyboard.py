@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from sshkeyboard import listen_keyboard
 
-from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
+from holosoma_inference.inputs.api.base import StateCommandProvider, VelCmdProvider
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 if TYPE_CHECKING:
@@ -128,7 +128,7 @@ def _ensure_keyboard_listener(policy: BasePolicy) -> None:
     policy._keyboard_listener.start()
 
 
-class KeyboardVelocityInput(VelocityInput):
+class KeyboardVelCmdProvider(VelCmdProvider):
     """Tracks keyboard velocity increments and returns absolute velocity.
 
     Subscribes to its own keyboard queue. Maps velocity keycodes (WASD/QE)

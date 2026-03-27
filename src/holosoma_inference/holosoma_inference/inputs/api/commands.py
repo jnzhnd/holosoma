@@ -4,7 +4,7 @@
 policy") decoupled from the physical input that triggered it.
 
 ``VelCmd`` is a value object carrying absolute velocity state
-produced by ``VelocityInput`` providers each cycle.
+produced by ``VelCmdProvider`` providers each cycle.
 
 Device-to-command mappings live in their respective impl modules
 (``keyboard.py``, ``joystick.py``, ``ros2.py``).
@@ -18,7 +18,7 @@ from enum import Enum, auto
 
 @dataclass(frozen=True)
 class VelCmd:
-    """Absolute velocity state emitted by VelocityInput providers."""
+    """Absolute velocity state emitted by VelCmdProvider providers."""
 
     lin_vel: tuple[float, float]  # linear x, y (m/s)
     ang_vel: float  # angular z (rad/s)

@@ -378,10 +378,10 @@ class BasePolicy:
         self._command_provider = self._create_command_provider(other)
 
         # Wire shared joystick state when both channels use joystick
-        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelCmdProvider
 
         if isinstance(self._command_provider, JoystickStateCommandProvider) and isinstance(
-            self._velocity_input, JoystickVelocityInput
+            self._velocity_input, JoystickVelCmdProvider
         ):
             self._command_provider._shared_velocity = self._velocity_input
 
@@ -397,19 +397,19 @@ class BasePolicy:
         Uses ``_keyboard_velocity_mapping`` class attribute for keyboard.
         """
         if source == InputSource.keyboard:
-            from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+            from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
             listener = self._get_keyboard_listener()
             queue = listener.subscribe() if listener else deque()
-            return KeyboardVelocityInput(queue, self._keyboard_velocity_mapping)
+            return KeyboardVelCmdProvider(queue, self._keyboard_velocity_mapping)
         if source == InputSource.joystick:
-            from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
+            from holosoma_inference.inputs.impl.joystick import JoystickVelCmdProvider
 
-            return JoystickVelocityInput(self)
+            return JoystickVelCmdProvider(self)
         if source == InputSource.ros2:
-            from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
+            from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-            return Ros2VelocityInput(self)
+            return Ros2VelCmdProvider(self)
         raise ValueError(f"Unknown velocity input source: {source}")
 
     def _create_command_provider(self, source: InputSource):

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
+from holosoma_inference.inputs.api.base import StateCommandProvider, VelCmdProvider
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 if TYPE_CHECKING:
@@ -26,7 +26,7 @@ ROS2_COMMAND_MAP: dict[str, StateCommand] = {
 }
 
 
-class Ros2VelocityInput(VelocityInput):
+class Ros2VelCmdProvider(VelCmdProvider):
     """Subscribes to ROS2 TwistStamped topic for velocity commands."""
 
     def __init__(self, policy: BasePolicy):

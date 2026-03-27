@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from holosoma_inference.inputs.api.base import StateCommandProvider, VelocityInput
+from holosoma_inference.inputs.api.base import StateCommandProvider, VelCmdProvider
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ JOYSTICK_WBT: dict[str, StateCommand] = {
 }
 
 
-class JoystickVelocityInput(VelocityInput):
+class JoystickVelCmdProvider(VelCmdProvider):
     """Reads joystick sticks for velocity. Caches button states for shared use."""
 
     def __init__(self, policy: BasePolicy):
@@ -76,7 +76,7 @@ class JoystickStateCommandProvider(StateCommandProvider):
     def __init__(self, policy: BasePolicy, mapping: dict[str, StateCommand]):
         super().__init__(mapping)
         self.policy = policy
-        self._shared_velocity: JoystickVelocityInput | None = None
+        self._shared_velocity: JoystickVelCmdProvider | None = None
         self._key_states: dict[str, bool] = {}
         self._last_key_states: dict[str, bool] = {}
 

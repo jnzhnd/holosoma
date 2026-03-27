@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 
-class VelocityInput(ABC):
+class VelCmdProvider(ABC):
     """Provides absolute velocity state each cycle.
 
     Implementations read from their device (joystick sticks, keyboard

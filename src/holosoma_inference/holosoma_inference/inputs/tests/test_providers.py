@@ -297,12 +297,12 @@ class TestKeyboardStateCommandProvider:
 # ============================================================================
 
 
-class TestKeyboardVelocityInput:
+class TestKeyboardVelCmdProvider:
     def test_poll_returns_velocity_command(self):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         queue = deque()
-        prov = KeyboardVelocityInput(queue, KEYBOARD_VELOCITY_LOCOMOTION)
+        prov = KeyboardVelCmdProvider(queue, KEYBOARD_VELOCITY_LOCOMOTION)
         queue.append("w")
         vc = prov.poll()
         assert isinstance(vc, VelCmd)
@@ -311,30 +311,30 @@ class TestKeyboardVelocityInput:
         assert pytest.approx(vc.ang_vel) == 0.0
 
     def test_poll_accumulates_increments(self):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         queue = deque()
-        prov = KeyboardVelocityInput(queue, KEYBOARD_VELOCITY_LOCOMOTION)
+        prov = KeyboardVelCmdProvider(queue, KEYBOARD_VELOCITY_LOCOMOTION)
         queue.extend(["w", "w", "a"])
         vc = prov.poll()
         assert pytest.approx(vc.lin_vel[0]) == 0.2
         assert pytest.approx(vc.lin_vel[1]) == 0.1
 
     def test_poll_angular_velocity(self):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         queue = deque()
-        prov = KeyboardVelocityInput(queue, KEYBOARD_VELOCITY_LOCOMOTION)
+        prov = KeyboardVelCmdProvider(queue, KEYBOARD_VELOCITY_LOCOMOTION)
         queue.extend(["q", "e", "e"])
         vc = prov.poll()
         assert pytest.approx(vc.ang_vel) == 0.1  # -0.1 + 0.1 + 0.1
 
     def test_poll_returns_snapshot(self):
         """Returned values are snapshots, not affected by later polls."""
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         queue = deque()
-        prov = KeyboardVelocityInput(queue, KEYBOARD_VELOCITY_LOCOMOTION)
+        prov = KeyboardVelCmdProvider(queue, KEYBOARD_VELOCITY_LOCOMOTION)
         queue.append("w")
         vc1 = prov.poll()
         queue.append("w")
@@ -343,10 +343,10 @@ class TestKeyboardVelocityInput:
         assert pytest.approx(vc2.lin_vel[0]) == 0.2
 
     def test_zero_resets_state(self):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         queue = deque()
-        prov = KeyboardVelocityInput(queue, KEYBOARD_VELOCITY_LOCOMOTION)
+        prov = KeyboardVelCmdProvider(queue, KEYBOARD_VELOCITY_LOCOMOTION)
         queue.extend(["w", "a", "e"])
         prov.poll()
         prov.zero()
@@ -357,30 +357,30 @@ class TestKeyboardVelocityInput:
 
     def test_no_velocity_keys_returns_none(self):
         """When no velocity keys mapping, poll() returns None and clears queue."""
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         queue = deque()
-        prov = KeyboardVelocityInput(queue)
+        prov = KeyboardVelCmdProvider(queue)
         queue.append("w")
         assert prov.poll() is None
         assert len(queue) == 0  # queue cleared
 
     def test_unmapped_keys_ignored(self):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         queue = deque()
-        prov = KeyboardVelocityInput(queue, KEYBOARD_VELOCITY_LOCOMOTION)
+        prov = KeyboardVelCmdProvider(queue, KEYBOARD_VELOCITY_LOCOMOTION)
         queue.extend(["]", "o", "w"])  # ] and o are command keys, not velocity
         vc = prov.poll()
         assert pytest.approx(vc.lin_vel[0]) == 0.1  # only w applied
 
     def test_broadcast_isolation(self):
         """Two providers on separate subscriber queues get independent events."""
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         q1 = deque()
         q2 = deque()
-        vel = KeyboardVelocityInput(q1, KEYBOARD_VELOCITY_LOCOMOTION)
+        vel = KeyboardVelCmdProvider(q1, KEYBOARD_VELOCITY_LOCOMOTION)
 
         # Simulate broadcast
         q1.append("w")
@@ -396,17 +396,17 @@ class TestKeyboardVelocityInput:
 # ============================================================================
 
 
-class TestJoystickVelocityInput:
+class TestJoystickVelCmdProvider:
     def test_poll_returns_none_when_no_msg(self, policy):
-        from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickVelCmdProvider
 
         policy.interface.get_joystick_msg.return_value = None
-        prov = JoystickVelocityInput(policy)
+        prov = JoystickVelCmdProvider(policy)
         assert prov.poll() is None
         policy.interface.process_joystick_input.assert_not_called()
 
     def test_poll_returns_velocity_command(self, policy):
-        from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickVelCmdProvider
 
         new_lin = np.array([[0.5, 0.0]])
         new_ang = np.array([[0.1]])
@@ -414,7 +414,7 @@ class TestJoystickVelocityInput:
         policy.interface.get_joystick_msg.return_value = "msg"
         policy.interface.process_joystick_input.return_value = (new_lin, new_ang, new_keys)
 
-        prov = JoystickVelocityInput(policy)
+        prov = JoystickVelCmdProvider(policy)
         vc = prov.poll()
 
         assert isinstance(vc, VelCmd)
@@ -423,7 +423,7 @@ class TestJoystickVelocityInput:
         assert prov.key_states == {"A": True}
 
     def test_poll_preserves_last_key_states(self, policy):
-        from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickVelCmdProvider
 
         policy.interface.get_joystick_msg.return_value = "msg"
         policy.interface.process_joystick_input.return_value = (
@@ -432,7 +432,7 @@ class TestJoystickVelocityInput:
             {"A": True},
         )
 
-        prov = JoystickVelocityInput(policy)
+        prov = JoystickVelCmdProvider(policy)
         prov.key_states = {"B": True}
         prov.poll()
 
@@ -443,9 +443,9 @@ class TestJoystickVelocityInput:
 class TestJoystickStateCommandProvider:
     def test_poll_multiple_rising_edges(self, policy):
         """Multiple buttons pressed simultaneously produce multiple commands."""
-        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelCmdProvider
 
-        vel = JoystickVelocityInput(policy)
+        vel = JoystickVelCmdProvider(policy)
         vel.key_states = {"A": True, "B": True, "Y": True}
         vel.last_key_states = {"A": False, "B": False, "Y": False}
 
@@ -457,9 +457,9 @@ class TestJoystickStateCommandProvider:
 
     def test_poll_shared_edge_detection(self, policy):
         """When shared with velocity provider, returns commands for rising edges."""
-        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelCmdProvider
 
-        vel = JoystickVelocityInput(policy)
+        vel = JoystickVelCmdProvider(policy)
         vel.key_states = {"A": True}
         vel.last_key_states = {"A": False}
 
@@ -471,9 +471,9 @@ class TestJoystickStateCommandProvider:
 
     def test_poll_shared_no_dispatch_on_hold(self, policy):
         """No commands when button was already held."""
-        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelCmdProvider
 
-        vel = JoystickVelocityInput(policy)
+        vel = JoystickVelCmdProvider(policy)
         vel.key_states = {"A": True}
         vel.last_key_states = {"A": True}
 
@@ -505,9 +505,9 @@ class TestJoystickStateCommandProvider:
 
     def test_unmapped_button_not_in_commands(self, policy):
         """Buttons not in the mapping are silently ignored."""
-        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelCmdProvider
 
-        vel = JoystickVelocityInput(policy)
+        vel = JoystickVelCmdProvider(policy)
         vel.key_states = {"UNKNOWN": True}
         vel.last_key_states = {"UNKNOWN": False}
 
@@ -523,11 +523,11 @@ class TestJoystickStateCommandProvider:
 # ============================================================================
 
 
-class TestRos2VelocityInput:
+class TestRos2VelCmdProvider:
     def test_callback_stores_velocity(self, policy):
-        from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelocityInput(policy)
+        prov = Ros2VelCmdProvider(policy)
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=0.5, y=-0.3),
@@ -542,9 +542,9 @@ class TestRos2VelocityInput:
         assert vc.ang_vel == pytest.approx(0.8)
 
     def test_callback_clamps_to_range(self, policy):
-        from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelocityInput(policy)
+        prov = Ros2VelCmdProvider(policy)
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=5.0, y=-5.0),
@@ -559,9 +559,9 @@ class TestRos2VelocityInput:
 
     def test_frozen_values_stable(self, policy):
         """Frozen dataclass with plain types — values can't change after creation."""
-        from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelocityInput(policy)
+        prov = Ros2VelCmdProvider(policy)
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=0.5, y=0.0),
@@ -659,25 +659,25 @@ class TestBasePolicyFactory:
         return bp
 
     def test_keyboard_velocity(self, monkeypatch):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         bp = self._make_base(monkeypatch)
         result = bp._create_velocity_input(InputSource.keyboard)
-        assert isinstance(result, KeyboardVelocityInput)
+        assert isinstance(result, KeyboardVelCmdProvider)
 
     def test_joystick_velocity(self):
-        from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickVelCmdProvider
 
         bp = self._make_base()
         result = bp._create_velocity_input(InputSource.joystick)
-        assert isinstance(result, JoystickVelocityInput)
+        assert isinstance(result, JoystickVelCmdProvider)
 
     def test_ros2_velocity(self):
-        from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
         bp = self._make_base()
         result = bp._create_velocity_input(InputSource.ros2)
-        assert isinstance(result, Ros2VelocityInput)
+        assert isinstance(result, Ros2VelCmdProvider)
 
     def test_keyboard_other(self, monkeypatch):
         from holosoma_inference.inputs.impl.keyboard import KeyboardStateCommandProvider
@@ -724,11 +724,11 @@ class TestLocomotionPolicyFactory:
         return lp
 
     def test_keyboard_velocity_has_locomotion_mapping(self, monkeypatch):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         lp = self._make_loco(monkeypatch)
         result = lp._create_velocity_input(InputSource.keyboard)
-        assert type(result) is KeyboardVelocityInput
+        assert type(result) is KeyboardVelCmdProvider
         assert result._velocity_keys is KEYBOARD_VELOCITY_LOCOMOTION
 
     def test_keyboard_other_uses_locomotion_mapping(self, monkeypatch):
@@ -748,17 +748,17 @@ class TestLocomotionPolicyFactory:
         assert result._mapping is JOYSTICK_LOCOMOTION
 
     def test_joystick_velocity_falls_to_base(self):
-        from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickVelCmdProvider
 
         lp = self._make_loco()
         result = lp._create_velocity_input(InputSource.joystick)
-        assert type(result) is JoystickVelocityInput
+        assert type(result) is JoystickVelCmdProvider
 
     def test_ros2_falls_to_base(self):
-        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider, Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider, Ros2VelCmdProvider
 
         lp = self._make_loco()
-        assert isinstance(lp._create_velocity_input(InputSource.ros2), Ros2VelocityInput)
+        assert isinstance(lp._create_velocity_input(InputSource.ros2), Ros2VelCmdProvider)
         assert isinstance(lp._create_command_provider(InputSource.ros2), Ros2StateCommandProvider)
 
 
@@ -792,19 +792,19 @@ class TestWbtPolicyFactory:
         assert result._mapping is JOYSTICK_WBT
 
     def test_keyboard_velocity_no_velocity_keys(self, monkeypatch):
-        """WBT has no velocity keys — KeyboardVelocityInput returns None."""
-        from holosoma_inference.inputs.impl.keyboard import KeyboardVelocityInput
+        """WBT has no velocity keys — KeyboardVelCmdProvider returns None."""
+        from holosoma_inference.inputs.impl.keyboard import KeyboardVelCmdProvider
 
         wp = self._make_wbt(monkeypatch)
         result = wp._create_velocity_input(InputSource.keyboard)
-        assert type(result) is KeyboardVelocityInput
+        assert type(result) is KeyboardVelCmdProvider
         assert result._velocity_keys == {}
 
     def test_ros2_falls_to_base(self):
-        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider, Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider, Ros2VelCmdProvider
 
         wp = self._make_wbt()
-        assert isinstance(wp._create_velocity_input(InputSource.ros2), Ros2VelocityInput)
+        assert isinstance(wp._create_velocity_input(InputSource.ros2), Ros2VelCmdProvider)
         assert isinstance(wp._create_command_provider(InputSource.ros2), Ros2StateCommandProvider)
 
 
@@ -895,13 +895,13 @@ class TestDualModeSwitching:
         dual.secondary._handle_start_policy.assert_called_once()
 
     def test_joystick_state_carry_over(self):
-        from holosoma_inference.inputs.impl.joystick import JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickVelCmdProvider
 
         dual = _make_dual()
-        # Replace mock velocity inputs with real JoystickVelocityInput
-        pri_vel = JoystickVelocityInput(dual.primary)
+        # Replace mock velocity inputs with real JoystickVelCmdProvider
+        pri_vel = JoystickVelCmdProvider(dual.primary)
         pri_vel.key_states = {"X": True, "A": False}
-        sec_vel = JoystickVelocityInput(dual.secondary)
+        sec_vel = JoystickVelCmdProvider(dual.secondary)
 
         dual.primary._velocity_input = pri_vel
         dual.secondary._velocity_input = sec_vel
@@ -1020,9 +1020,9 @@ class TestChannelSeparation:
 
     def test_joystick_other_ignores_unmapped_buttons(self, policy):
         """JoystickStateCommandProvider only returns commands for mapped buttons."""
-        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelocityInput
+        from holosoma_inference.inputs.impl.joystick import JoystickStateCommandProvider, JoystickVelCmdProvider
 
-        vel = JoystickVelocityInput(policy)
+        vel = JoystickVelCmdProvider(policy)
         vel.key_states = {"unknown_stick": True}
         vel.last_key_states = {"unknown_stick": False}
 
@@ -1039,9 +1039,9 @@ class TestChannelSeparation:
 class TestRos2VelocityEdgeCases:
     def test_callback_clamps_negative_angular(self, policy):
         """Angular velocity is clamped at both ends."""
-        from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelocityInput(policy)
+        prov = Ros2VelCmdProvider(policy)
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=0.0, y=0.0),
@@ -1054,9 +1054,9 @@ class TestRos2VelocityEdgeCases:
 
     def test_callback_exact_boundary_values(self, policy):
         """Values exactly at +/-1.0 pass through unchanged."""
-        from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelocityInput(policy)
+        prov = Ros2VelCmdProvider(policy)
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=1.0, y=-1.0),
@@ -1070,9 +1070,9 @@ class TestRos2VelocityEdgeCases:
 
     def test_callback_zero_passes_through(self, policy):
         """Zero velocity is not clamped or modified."""
-        from holosoma_inference.inputs.impl.ros2 import Ros2VelocityInput
+        from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelocityInput(policy)
+        prov = Ros2VelCmdProvider(policy)
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=0.0, y=0.0),
