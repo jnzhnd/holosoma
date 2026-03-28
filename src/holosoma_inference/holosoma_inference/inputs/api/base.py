@@ -49,5 +49,3 @@ class StateCommandProvider(Protocol):
 
 class InputProvider(VelCmdProvider, StateCommandProvider, Protocol):
     """Combined protocol for devices that provide both velocity and commands."""
-
-    ...
