@@ -30,4 +30,3 @@ def create_input(policy: BasePolicy, source: InputSource, role: str):
         )
 
     raise ValueError(f"Unknown input source: {source}")
-

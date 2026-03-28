@@ -2,6 +2,7 @@ import numpy as np
 from termcolor import colored
 
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
+
 from .base import BasePolicy
 
 
