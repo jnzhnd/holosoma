@@ -26,7 +26,7 @@ def create_input(policy: BasePolicy, source: InputSource, role: str):
 
     if source == "ros2":
         if role == "velocity":
-            return Ros2VelCmdProvider(policy)
-        return Ros2StateCommandProvider(policy)
+            return Ros2VelCmdProvider(policy.config.task.ros_cmd_vel_topic)
+        return Ros2StateCommandProvider(policy.config.task.ros_state_input_topic)
 
     raise ValueError(f"Unknown input source: {source}")

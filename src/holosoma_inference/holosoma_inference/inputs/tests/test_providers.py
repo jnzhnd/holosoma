@@ -56,7 +56,7 @@ def _make_policy(**overrides):
     p.config = SimpleNamespace(
         task=SimpleNamespace(
             ros_cmd_vel_topic="cmd_vel",
-            ros_command_provider_topic="holosoma/state_input",
+            ros_state_input_topic="holosoma/state_input",
         )
     )
     for k, v in overrides.items():
@@ -167,13 +167,13 @@ class TestProtocolConformance:
     def test_ros2_vel_satisfies_protocol(self):
         from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelCmdProvider(_make_policy())
+        prov = Ros2VelCmdProvider("cmd_vel")
         assert isinstance(prov, VelCmdProvider)
 
     def test_ros2_cmd_satisfies_protocol(self):
         from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2StateCommandProvider(_make_policy())
+        prov = Ros2StateCommandProvider("holosoma/state_input")
         assert isinstance(prov, StateCommandProvider)
 
 
@@ -569,7 +569,7 @@ class TestRos2VelCmdProvider:
     def test_callback_stores_velocity(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelCmdProvider(policy)
+        prov = Ros2VelCmdProvider("cmd_vel")
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=0.5, y=-0.3),
@@ -586,7 +586,7 @@ class TestRos2VelCmdProvider:
     def test_callback_clamps_to_range(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelCmdProvider(policy)
+        prov = Ros2VelCmdProvider("cmd_vel")
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=5.0, y=-5.0),
@@ -602,7 +602,7 @@ class TestRos2VelCmdProvider:
     def test_frozen_values_stable(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelCmdProvider(policy)
+        prov = Ros2VelCmdProvider("cmd_vel")
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=0.5, y=0.0),
@@ -620,7 +620,7 @@ class TestRos2StateCommandProvider:
     def test_known_commands_queued(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2StateCommandProvider(policy)
+        prov = Ros2StateCommandProvider("holosoma/state_input")
         prov._callback(SimpleNamespace(data="start"))
         prov._callback(SimpleNamespace(data="stop"))
         prov._callback(SimpleNamespace(data="init"))
@@ -630,24 +630,25 @@ class TestRos2StateCommandProvider:
     def test_walk_stand_commands(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2StateCommandProvider(policy)
+        prov = Ros2StateCommandProvider("holosoma/state_input")
         prov._callback(SimpleNamespace(data="walk"))
         prov._callback(SimpleNamespace(data="stand"))
 
         assert prov.poll_commands() == [StateCommand.WALK, StateCommand.STAND]
 
-    def test_unknown_command_warns(self, policy):
+    def test_unknown_command_warns(self):
         from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2StateCommandProvider(policy)
+        prov = Ros2StateCommandProvider("holosoma/state_input")
+        prov._logger = MagicMock()
         prov._callback(SimpleNamespace(data="bogus"))
-        policy.logger.warning.assert_called_once()
+        prov._logger.warning.assert_called_once()
         assert prov.poll_commands() == []
 
     def test_whitespace_and_case_normalization(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2StateCommandProvider(policy)
+        prov = Ros2StateCommandProvider("holosoma/state_input")
         prov._callback(SimpleNamespace(data="  WALK  "))
 
         assert prov.poll_commands() == [StateCommand.WALK]
@@ -655,7 +656,7 @@ class TestRos2StateCommandProvider:
     def test_poll_drains_queue(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2StateCommandProvider(policy)
+        prov = Ros2StateCommandProvider("holosoma/state_input")
         prov._callback(SimpleNamespace(data="start"))
         assert prov.poll_commands() == [StateCommand.START]
         assert prov.poll_commands() == []
@@ -1026,7 +1027,7 @@ class TestRos2VelocityEdgeCases:
     def test_callback_clamps_negative_angular(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelCmdProvider(policy)
+        prov = Ros2VelCmdProvider("cmd_vel")
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=0.0, y=0.0),
@@ -1039,7 +1040,7 @@ class TestRos2VelocityEdgeCases:
     def test_callback_exact_boundary_values(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelCmdProvider(policy)
+        prov = Ros2VelCmdProvider("cmd_vel")
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=1.0, y=-1.0),
@@ -1054,7 +1055,7 @@ class TestRos2VelocityEdgeCases:
     def test_callback_zero_passes_through(self, policy):
         from holosoma_inference.inputs.impl.ros2 import Ros2VelCmdProvider
 
-        prov = Ros2VelCmdProvider(policy)
+        prov = Ros2VelCmdProvider("cmd_vel")
         msg = SimpleNamespace(
             twist=SimpleNamespace(
                 linear=SimpleNamespace(x=0.0, y=0.0),
@@ -1068,12 +1069,13 @@ class TestRos2VelocityEdgeCases:
 
 
 class TestRos2StateCommandProviderEdgeCases:
-    def test_empty_string_warns(self, policy):
+    def test_empty_string_warns(self):
         from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider
 
-        prov = Ros2StateCommandProvider(policy)
+        prov = Ros2StateCommandProvider("holosoma/state_input")
+        prov._logger = MagicMock()
         prov._callback(SimpleNamespace(data="   "))
-        policy.logger.warning.assert_called_once()
+        prov._logger.warning.assert_called_once()
         assert prov.poll_commands() == []
 
 

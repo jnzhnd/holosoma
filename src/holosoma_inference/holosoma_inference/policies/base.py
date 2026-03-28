@@ -364,22 +364,6 @@ class BasePolicy:
         if self._command_provider is not self._velocity_input:
             self._command_provider.start()
 
-    def _init_ros_node(self):
-        """Ensure rclpy is initialized and we have a ROS2 node."""
-        if hasattr(self, "node") and self.node is not None:
-            return  # Already initialized (e.g. by use_ros rate handler)
-        import rclpy
-
-        try:
-            rclpy.init(args=None)
-        except RuntimeError:
-            pass  # Already initialized
-        self.node = rclpy.create_node("policy_node")
-        self.logger = self.node.get_logger()
-        self.rate = self.node.create_rate(self.rl_rate)
-        thread = threading.Thread(target=rclpy.spin, args=(self.node,), daemon=True)
-        thread.start()
-
     # ============================================================================
     # Policy Methods
     # ============================================================================
