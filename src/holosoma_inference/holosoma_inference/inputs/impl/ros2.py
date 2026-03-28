@@ -21,6 +21,7 @@ ROS2_COMMAND_MAP: dict[str, StateCommand] = {
     "stand": StateCommand.STAND,
 }
 
+
 def _ensure_ros2_init() -> None:
     """Call rclpy.init() if not already initialized."""
     import rclpy

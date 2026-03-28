@@ -91,9 +91,6 @@ class TaskConfig:
     residual_upper_body_action: bool = False
     """Whether to use residual control for upper body."""
 
-    use_ros: bool = False
-    """Use ROS2 for rate limiting."""
-
     print_observations: bool = False
     """Print observation vectors for debugging."""
 

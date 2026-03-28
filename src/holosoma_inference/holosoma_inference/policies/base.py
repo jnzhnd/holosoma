@@ -3,7 +3,6 @@ from __future__ import annotations
 import itertools
 import json
 import sys
-import threading
 import time
 from collections import deque
 from dataclasses import replace
@@ -300,20 +299,10 @@ class BasePolicy:
         self._init_input_device()
 
     def _init_rate_handler(self):
-        """Initialize ROS handler if enabled."""
+        """Initialize rate limiter and logger."""
         self.rl_rate = self.config.task.rl_rate
-        if self.config.task.use_ros:
-            import rclpy
-
-            rclpy.init(args=None)
-            self.node = rclpy.create_node("policy_node")
-            self.logger = self.node.get_logger()
-            self.rate = self.node.create_rate(self.rl_rate)
-            thread = threading.Thread(target=rclpy.spin, args=(self.node,), daemon=True)
-            thread.start()
-        else:
-            self.logger = logger
-            self.rate = RateLimiter(self.rl_rate)
+        self.logger = logger
+        self.rate = RateLimiter(self.rl_rate)
 
     def _init_input_device(self):
         """Initialize input hardware and create input providers.

@@ -23,7 +23,6 @@ locomotion = TaskConfig(
     state_input="keyboard",
     joystick_type="xbox",
     joystick_device=0,
-    use_ros=False,
     wandb_download_dir="/tmp",
 )
 
@@ -43,7 +42,6 @@ wbt = TaskConfig(
     state_input="keyboard",
     joystick_type="xbox",
     joystick_device=0,
-    use_ros=False,
     wandb_download_dir="/tmp",
 )
 
@@ -62,7 +60,6 @@ safety_locomotion_g1 = TaskConfig(
     state_input="keyboard",
     joystick_type="xbox",
     joystick_device=0,
-    use_ros=False,
     wandb_download_dir="/tmp",
 )
 
