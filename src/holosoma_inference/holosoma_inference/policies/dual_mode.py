@@ -76,9 +76,9 @@ class DualModePolicy:
         """Inject SWITCH_MODE into mappings and patch dispatch for routing.
 
         Keyboard queue wiring is handled by the factory — the secondary's
-        ``KeyboardStateCommandProvider`` gets its own subscriber queue from the
-        shared ``KeyboardListener`` via ``_get_keyboard_listener()``.
-        Only ``_dispatch_command`` needs patching to intercept SWITCH_MODE.
+        ``KeyboardInput`` gets its own subscriber queue from the shared
+        ``_KeyboardListenerThread``.  Only ``_dispatch_command`` needs
+        patching to intercept SWITCH_MODE.
         """
         from holosoma_inference.inputs.api.commands import StateCommand
 

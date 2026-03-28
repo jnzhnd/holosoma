@@ -183,28 +183,20 @@ class TestProtocolConformance:
 
 
 class TestKeyboardListener:
-    def test_start_is_idempotent(self, policy):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardListener
+    def test_start_is_idempotent(self, monkeypatch):
+        from holosoma_inference.inputs.impl.keyboard import _KeyboardListenerThread
 
-        del policy._shared_hardware_source
-        listener = KeyboardListener(policy)
-        listener.start()
-        listener.start()  # second call should be a no-op
-        assert listener._started is True
-
-    def test_skips_thread_in_non_tty(self, policy, monkeypatch):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardListener
-
-        del policy._shared_hardware_source
         monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-        policy.use_keyboard = True
-        policy.use_policy_action = False
+        listener = _KeyboardListenerThread()
+        assert listener.start() is False
+        assert listener.start() is False  # second call should be a no-op
 
-        listener = KeyboardListener(policy)
-        listener.start()
+    def test_returns_false_in_non_tty(self, monkeypatch):
+        from holosoma_inference.inputs.impl.keyboard import _KeyboardListenerThread
 
-        assert policy.use_keyboard is False
-        assert policy.use_policy_action is True
+        monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+        listener = _KeyboardListenerThread()
+        assert listener.start() is False
 
     def test_ensure_skips_shared_hardware(self, policy):
         from holosoma_inference.inputs.impl.keyboard import _ensure_keyboard_listener
@@ -215,7 +207,7 @@ class TestKeyboardListener:
         assert not hasattr(policy, "_keyboard_listener")
 
     def test_ensure_creates_and_shares_listener(self, monkeypatch):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardListener, _ensure_keyboard_listener
+        from holosoma_inference.inputs.impl.keyboard import _ensure_keyboard_listener, _KeyboardListenerThread
 
         p = _make_policy()
         del p._shared_hardware_source
@@ -223,18 +215,16 @@ class TestKeyboardListener:
         monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
         _ensure_keyboard_listener(p)
-        assert isinstance(p._keyboard_listener, KeyboardListener)
+        assert isinstance(p._keyboard_listener, _KeyboardListenerThread)
 
         first = p._keyboard_listener
         _ensure_keyboard_listener(p)
         assert p._keyboard_listener is first
 
     def test_broadcast_to_multiple_subscribers(self):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardListener
+        from holosoma_inference.inputs.impl.keyboard import _KeyboardListenerThread
 
-        p = _make_policy()
-        del p._shared_hardware_source
-        listener = KeyboardListener(p)
+        listener = _KeyboardListenerThread()
         q1 = listener.subscribe()
         q2 = listener.subscribe()
 
@@ -924,7 +914,7 @@ class TestDualModeSwitching:
 @_skip_dual_mode
 class TestDualModeKeyboardQueueWiring:
     def test_broadcast_queues_are_independent(self):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardInput, KeyboardListener
+        from holosoma_inference.inputs.impl.keyboard import KeyboardInput, _KeyboardListenerThread
         from holosoma_inference.policies.dual_mode import DualModePolicy
 
         dual = object.__new__(DualModePolicy)
@@ -933,7 +923,7 @@ class TestDualModeKeyboardQueueWiring:
         dual.active = dual.primary
         dual.active_label = "primary"
 
-        listener = KeyboardListener(dual.primary)
+        listener = _KeyboardListenerThread()
         q1 = listener.subscribe()
         q2 = listener.subscribe()
         dual.primary._keyboard_listener = listener
@@ -953,7 +943,7 @@ class TestDualModeKeyboardQueueWiring:
         assert dual.primary._command_provider._queue is not dual.secondary._command_provider._queue
 
     def test_keyboard_commands_reach_active_via_poll(self):
-        from holosoma_inference.inputs.impl.keyboard import KeyboardInput, KeyboardListener
+        from holosoma_inference.inputs.impl.keyboard import KeyboardInput, _KeyboardListenerThread
         from holosoma_inference.policies.dual_mode import DualModePolicy
 
         dual = object.__new__(DualModePolicy)
@@ -962,7 +952,7 @@ class TestDualModeKeyboardQueueWiring:
         dual.active = dual.primary
         dual.active_label = "primary"
 
-        listener = KeyboardListener(dual.primary)
+        listener = _KeyboardListenerThread()
         q1 = listener.subscribe()
         q2 = listener.subscribe()
         dual.primary._keyboard_listener = listener

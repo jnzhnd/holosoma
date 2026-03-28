@@ -53,46 +53,31 @@ KEYBOARD_VELOCITY_LOCOMOTION: dict[str, tuple[int, int, float]] = {
 }
 
 
-class KeyboardListener:
-    """Shared sshkeyboard listener thread.
+class _KeyboardListenerThread(threading.Thread):
+    """Daemon thread that broadcasts keypresses to subscriber queues.
 
-    Created lazily by the factory and stored on the policy as
-    ``_keyboard_listener``.  Multiple providers share one instance;
-    ``start()`` is idempotent.  Keypresses are broadcast to all
-    subscriber queues.
+    ``start()`` is idempotent and returns whether the listener is active.
     """
 
-    def __init__(self, policy: BasePolicy) -> None:
-        self._policy = policy
-        self._started = False
+    def __init__(self) -> None:
+        super().__init__(daemon=True)
         self._subscribers: list[deque[str]] = []
 
     def subscribe(self) -> deque[str]:
-        """Create and return a new subscriber queue. All keypresses are broadcast to it."""
         q: deque[str] = deque()
         self._subscribers.append(q)
         return q
 
-    def start(self) -> None:
-        """Start the listener thread (idempotent, skipped for shared-hardware secondaries)."""
-        if self._started:
-            return
-        self._started = True
-
+    def start(self) -> bool:
+        """Start the thread if not already running. Returns True if active."""
+        if self.is_alive():
+            return True
         if not sys.stdin.isatty():
-            self._policy.logger.warning("Not running in a TTY environment - keyboard input disabled")
-            self._policy.logger.warning("This is normal for automated tests or non-interactive environments")
-            self._policy.logger.info("Auto-starting policy in non-interactive mode")
-            self._policy.use_keyboard = False
-            self._policy.use_policy_action = True
-            return
+            return False
+        super().start()
+        return True
 
-        self._policy.use_keyboard = True
-        self._policy.logger.info("Using keyboard")
-        threading.Thread(target=self._listen, daemon=True).start()
-        self._policy.logger.info("Keyboard Listener Initialized")
-
-    def _listen(self) -> None:
+    def run(self) -> None:
         def on_press(keycode):
             for q in self._subscribers:
                 q.append(keycode)
@@ -101,22 +86,21 @@ class KeyboardListener:
             listener = listen_keyboard(on_press=on_press)
             listener.start()
             listener.join()
-        except OSError as e:
-            self._policy.logger.warning("Could not start keyboard listener: %s", e)
-            self._policy.logger.warning("Keyboard input will not be available")
+        except OSError:
+            pass
 
 
 def _ensure_keyboard_listener(policy: BasePolicy) -> None:
-    """Ensure the shared KeyboardListener exists and is started on *policy*.
-
-    Skipped when the policy is a shared-hardware secondary (the primary
-    policy's listener thread already dispatches to both).
-    """
+    """Ensure the shared listener thread exists and is started on *policy*."""
     if hasattr(policy, "_shared_hardware_source"):
         return
     if not hasattr(policy, "_keyboard_listener"):
-        policy._keyboard_listener = KeyboardListener(policy)
-    policy._keyboard_listener.start()
+        policy._keyboard_listener = _KeyboardListenerThread()
+    active = policy._keyboard_listener.start()
+    policy.use_keyboard = active
+    if not active:
+        policy.logger.warning("No TTY — keyboard input disabled")
+        policy.use_policy_action = True
 
 
 class KeyboardInput:
