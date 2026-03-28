@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from holosoma_inference.config.config_types.task import InputSource
+from holosoma_inference.inputs.api.base import StateCommandProvider, VelCmdProvider
 from holosoma_inference.inputs.impl.interface import InterfaceInput
 from holosoma_inference.inputs.impl.keyboard import KEYBOARD_VELOCITY_LOCOMOTION, KeyboardInput
 from holosoma_inference.inputs.impl.ros2 import Ros2Input
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
 
 
-def create_input(policy: BasePolicy, source: InputSource, role: str):
+def create_input(policy: BasePolicy, source: InputSource, role: str) -> VelCmdProvider | StateCommandProvider:
     """Create an input provider for the given source and role ("velocity" or "command")."""
     if not policy.use_joystick and source in ("interface", "joystick"):
         source = "keyboard"

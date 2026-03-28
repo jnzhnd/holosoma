@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from sshkeyboard import listen_keyboard
 
+from holosoma_inference.inputs.api.base import InputProvider
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 if TYPE_CHECKING:
@@ -103,7 +104,7 @@ def _ensure_keyboard_listener(policy: BasePolicy) -> None:
         policy.use_policy_action = True
 
 
-class KeyboardInput:
+class KeyboardInput(InputProvider):
     """Unified keyboard device implementing both velocity and command protocols.
 
     Subscribes to a single keyboard queue. ``poll_velocity()`` drains the queue,

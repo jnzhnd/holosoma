@@ -7,6 +7,7 @@ from collections import deque
 
 import numpy as np
 
+from holosoma_inference.inputs.api.base import InputProvider
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
 
 # ---------------------------------------------------------------------------
@@ -37,7 +38,7 @@ def _ensure_ros2_init() -> None:
             pass  # Already initialized
 
 
-class Ros2Input:
+class Ros2Input(InputProvider):
     """Single ROS2 node providing both velocity and state command inputs.
 
     Subscribes to a TwistStamped topic for velocity and a String topic for
