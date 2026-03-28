@@ -112,16 +112,19 @@ class TaskConfig:
             )
 
         shortcut: InputSource | None = None
+        flag_name: str | None = None
         if self.use_joystick:
             shortcut = "interface"
+            flag_name = "joystick"
         elif self.use_keyboard:
             shortcut = "keyboard"
+            flag_name = "keyboard"
 
         if shortcut is not None:
             has_custom_input = self.velocity_input != DEFAULT_VELOCITY_INPUT or self.state_input != DEFAULT_STATE_INPUT
             if has_custom_input:
                 raise ValueError(
-                    f"Cannot combine --task.use-{shortcut} with --task.velocity-input or "
+                    f"Cannot combine --task.use-{flag_name} with --task.velocity-input or "
                     "--task.state-input. Use either the shortcut flag or the individual "
                     "input settings, not both."
                 )

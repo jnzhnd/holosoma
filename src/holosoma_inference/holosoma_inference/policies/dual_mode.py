@@ -146,8 +146,10 @@ class DualModePolicy:
                 vc = self.active._velocity_input.poll_velocity()
                 if vc is not None:
                     self.active._apply_velocity(vc)
-                for cmd in self.active._command_provider.poll_commands():
+                commands = self.active._command_provider.poll_commands()
+                for cmd in commands:
                     self.active._dispatch_command(cmd)
+                if commands:
                     self.active._print_control_status()
                 if self.active.use_phase:
                     self.active.update_phase_time()
