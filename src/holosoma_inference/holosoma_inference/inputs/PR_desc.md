@@ -13,5 +13,5 @@ Opens:
 4. The `"s"` key maps to velocity decrement in locomotion (via `KEYBOARD_VELOCITY_LOCOMOTION`) and to `START_MOTION_CLIP` in WBT (via `KEYBOARD_COMMANDS`).
 
 TODOs:
-1. Get rid of _keyboard_velocity_mapping
 2. `ros2` should just implement one class with one node that implements both protocols.
+3. Remove mapping passing from InterfaceInput and KeyboardInput

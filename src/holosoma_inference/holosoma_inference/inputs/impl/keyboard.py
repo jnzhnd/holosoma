@@ -116,11 +116,10 @@ class KeyboardInput:
 
     def __init__(
         self,
-        mapping: dict[str, StateCommand],
         queue: deque[str],
         velocity_keys: dict[str, tuple[int, int, float]] | None = None,
     ) -> None:
-        self._mapping = mapping
+        self._mapping = dict(KEYBOARD_COMMANDS)
         self._queue = queue
         self._velocity_keys = velocity_keys or {}
         self._lin_vel = np.zeros((1, 2))
@@ -139,7 +138,7 @@ class KeyboardInput:
         if listener is None and hasattr(policy, "_shared_hardware_source"):
             listener = getattr(policy._shared_hardware_source, "_keyboard_listener", None)
         queue = listener.subscribe() if listener else deque()
-        return cls(KEYBOARD_COMMANDS, queue, velocity_keys)
+        return cls(queue, velocity_keys)
 
     def start(self) -> None:
         pass  # Listener already started by factory / create()

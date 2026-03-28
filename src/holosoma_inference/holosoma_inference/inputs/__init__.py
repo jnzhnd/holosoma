@@ -4,9 +4,8 @@ from typing import TYPE_CHECKING
 
 from holosoma_inference.config.config_types.task import InputSource
 from holosoma_inference.inputs.impl.interface import InterfaceInput
-from holosoma_inference.inputs.impl.joystick import JOYSTICK_COMMANDS
-from holosoma_inference.inputs.impl.keyboard import KeyboardInput
-from holosoma_inference.inputs.impl.ros2 import Ros2StateCommandProvider, Ros2VelCmdProvider
+from holosoma_inference.inputs.impl.keyboard import KEYBOARD_VELOCITY_LOCOMOTION, KeyboardInput
+from holosoma_inference.inputs.impl.ros2 import Ros2Input
 
 if TYPE_CHECKING:
     from holosoma_inference.policies.base import BasePolicy
@@ -18,15 +17,17 @@ def create_input(policy: BasePolicy, source: InputSource, role: str):
         source = "keyboard"
 
     if source in ("interface", "joystick"):
-        return InterfaceInput(policy.interface, JOYSTICK_COMMANDS)
+        return InterfaceInput(policy.interface)
 
     if source == "keyboard":
-        velocity_keys = getattr(policy, "_keyboard_velocity_mapping", None)
-        return KeyboardInput.create(policy, velocity_keys=velocity_keys)
+        vel_keys = KEYBOARD_VELOCITY_LOCOMOTION if role == "velocity" else None
+        return KeyboardInput.create(policy, velocity_keys=vel_keys)
 
     if source == "ros2":
-        if role == "velocity":
-            return Ros2VelCmdProvider(policy.config.task.ros_cmd_vel_topic)
-        return Ros2StateCommandProvider(policy.config.task.ros_state_input_topic)
+        return Ros2Input(
+            policy.config.task.ros_cmd_vel_topic,
+            policy.config.task.ros_state_input_topic,
+        )
 
     raise ValueError(f"Unknown input source: {source}")
+

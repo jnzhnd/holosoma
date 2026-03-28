@@ -2,14 +2,10 @@ import numpy as np
 from termcolor import colored
 
 from holosoma_inference.inputs.api.commands import StateCommand, VelCmd
-from holosoma_inference.inputs.impl.keyboard import KEYBOARD_VELOCITY_LOCOMOTION
-
 from .base import BasePolicy
 
 
 class LocomotionPolicy(BasePolicy):
-    _keyboard_velocity_mapping = KEYBOARD_VELOCITY_LOCOMOTION
-
     def __init__(self, config):
         super().__init__(config)
         self.is_standing = False
