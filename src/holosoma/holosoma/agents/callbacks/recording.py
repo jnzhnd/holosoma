@@ -90,6 +90,7 @@ class EvalRecordingCallback(RLEvalCallback):
         self._metadata["urdf_path"] = str(Path(asset_cfg.asset_root) / asset_cfg.urdf_file)
 
         channel_names = [
+            "dof_pos_target",
             "dof_pos",
             "dof_vel",
             "torques",
@@ -97,7 +98,6 @@ class EvalRecordingCallback(RLEvalCallback):
             "dof_pos_substep",
             "dof_vel_substep",
             "actions",
-            "dof_pos_target",
             "root_pos",
             "root_quat_xyzw",
             "root_lin_vel",
