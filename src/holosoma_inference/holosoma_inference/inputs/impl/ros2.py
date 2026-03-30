@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections import deque
 
 import numpy as np
@@ -46,12 +47,14 @@ class Ros2Input(InputProvider):
     discrete state commands.  One node, one spin thread.
     """
 
-    def __init__(self, vel_topic: str, cmd_topic: str):
+    def __init__(self, vel_topic: str, cmd_topic: str, vel_timeout: float = 1.0):
         self._vel_topic = vel_topic
         self._cmd_topic = cmd_topic
+        self._vel_timeout = vel_timeout
         # Velocity state
         self._lin_vel = np.zeros((1, 2))
         self._ang_vel = np.zeros((1, 1))
+        self._last_vel_time: float = 0.0
         self._lock = threading.Lock()
         # Command queue
         self._queue: deque[StateCommand] = deque()
@@ -76,6 +79,7 @@ class Ros2Input(InputProvider):
             self._lin_vel[0, 0] = max(-1.0, min(1.0, msg.twist.linear.x))
             self._lin_vel[0, 1] = max(-1.0, min(1.0, msg.twist.linear.y))
             self._ang_vel[0, 0] = max(-1.0, min(1.0, msg.twist.angular.z))
+            self._last_vel_time = time.monotonic()
 
     def _cmd_callback(self, msg):
         """Map ROS2 string command to enum and queue it."""
@@ -93,6 +97,12 @@ class Ros2Input(InputProvider):
 
     def poll_velocity(self) -> VelCmd:
         with self._lock:
+            if self._last_vel_time > 0 and (time.monotonic() - self._last_vel_time) > self._vel_timeout:
+                self._lin_vel[:] = 0.0
+                self._ang_vel[:] = 0.0
+                self._last_vel_time = 0.0
+                if self._logger is not None:
+                    self._logger.warning("Velocity timeout — zeroing commands")
             return VelCmd(
                 (float(self._lin_vel[0, 0]), float(self._lin_vel[0, 1])),
                 float(self._ang_vel[0, 0]),

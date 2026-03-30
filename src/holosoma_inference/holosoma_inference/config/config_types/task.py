@@ -78,6 +78,9 @@ class TaskConfig:
     ros_state_input_topic: str = "holosoma/state_input"
     """ROS2 topic name for discrete commands (used when state_input is "ros2")."""
 
+    ros_vel_timeout: float = 1.0
+    """Seconds without a velocity message before zeroing commands. Set to 0 to disable."""
+
     use_sim_time: bool = False
     """Use synchronized simulation time for WBT policies."""
 

@@ -28,6 +28,7 @@ def create_input(policy: BasePolicy, source: InputSource, role: str) -> VelCmdPr
         return Ros2Input(
             policy.config.task.ros_cmd_vel_topic,
             policy.config.task.ros_state_input_topic,
+            vel_timeout=policy.config.task.ros_vel_timeout,
         )
 
     raise ValueError(f"Unknown input source: {source}")
