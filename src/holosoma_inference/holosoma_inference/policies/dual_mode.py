@@ -82,11 +82,6 @@ class DualModePolicy:
         """
         from holosoma_inference.inputs.api.commands import StateCommand
 
-        # Inject the switch-mode key into both policies' state_input mappings
-        for p in (self.primary, self.secondary):
-            p._command_provider._mapping["X"] = StateCommand.SWITCH_MODE
-            p._command_provider._mapping["x"] = StateCommand.SWITCH_MODE
-
         # Patch _dispatch_command to intercept SWITCH_MODE
         self._orig_dispatch = {
             id(self.primary): self.primary._dispatch_command,

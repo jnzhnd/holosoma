@@ -20,6 +20,7 @@ ROS2_COMMAND_MAP: dict[str, StateCommand] = {
     "init": StateCommand.INIT,
     "walk": StateCommand.WALK,
     "stand": StateCommand.STAND,
+    "switch_mode": StateCommand.SWITCH_MODE,
 }
 
 
@@ -66,7 +67,7 @@ class Ros2Input(InputProvider):
         self._logger = node.get_logger()
         node.create_subscription(TwistStamped, self._vel_topic, self._vel_callback, 10)
         node.create_subscription(String, self._cmd_topic, self._cmd_callback, 10)
-        self._logger.info("Subscribed to ROS2 velocity: %s, commands: %s", self._vel_topic, self._cmd_topic)
+        self._logger.info(f"Subscribed to ROS2 velocity: {self._vel_topic}, commands: {self._cmd_topic}")
         threading.Thread(target=rclpy.spin, args=(node,), daemon=True).start()
 
     def _vel_callback(self, msg):
@@ -83,7 +84,7 @@ class Ros2Input(InputProvider):
         if cmd is not None:
             self._queue.append(cmd)
         elif self._logger is not None:
-            self._logger.warning("ROS2 command: unknown command '%s'", cmd_str)
+            self._logger.warning(f"ROS2 command: unknown command '{cmd_str}'")
 
     def zero(self) -> None:
         with self._lock:
