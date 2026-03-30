@@ -145,15 +145,13 @@ class KeyboardInput(InputProvider):
     def start(self) -> None:
         pass  # Listener already started by factory / create()
 
-    def poll_velocity(self) -> VelCmd | None:
-        has_velocity = bool(self._velocity_keys)
-
+    def _drain_queue(self) -> None:
+        """Process all pending keypresses into velocity state and command buffer."""
         while True:
             try:
                 keycode = self._queue.popleft()
             except IndexError:
                 break
-            # Try velocity first
             action = self._velocity_keys.get(keycode)
             if action is not None:
                 array_idx, col, delta = action
@@ -162,14 +160,14 @@ class KeyboardInput(InputProvider):
                 else:
                     self._ang_vel[0, col] += delta
                 continue
-            # Try command
             cmd = self._mapping.get(keycode)
             if cmd is not None:
                 self._pending_commands.append(cmd)
 
-        if not has_velocity:
+    def poll_velocity(self) -> VelCmd | None:
+        self._drain_queue()
+        if not self._velocity_keys:
             return None
-
         return VelCmd(
             (float(self._lin_vel[0, 0]), float(self._lin_vel[0, 1])),
             float(self._ang_vel[0, 0]),
@@ -181,16 +179,7 @@ class KeyboardInput(InputProvider):
         self._ang_vel[:] = 0.0
 
     def poll_commands(self) -> list[StateCommand]:
-        # Drain queue for any commands not yet processed (e.g. when this
-        # provider is used for commands only, without poll_velocity calls).
-        while True:
-            try:
-                keycode = self._queue.popleft()
-            except IndexError:
-                break
-            cmd = self._mapping.get(keycode)
-            if cmd is not None:
-                self._pending_commands.append(cmd)
+        self._drain_queue()
         commands = self._pending_commands
         self._pending_commands = []
         return commands
