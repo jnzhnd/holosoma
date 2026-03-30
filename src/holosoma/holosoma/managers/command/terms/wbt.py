@@ -133,18 +133,20 @@ class MotionLoader:
 
             self._body_pos_w = torch.tensor(body_pos_w_raw, dtype=torch.float32, device=device)
 
-            # Quaternions stored as wxyz in NPZ, convert to xyzw
-            body_quat_w_wxyz = torch.tensor(body_quat_w_raw, dtype=torch.float32, device=device)
-            self._body_quat_w = body_quat_w_wxyz[:, :, [1, 2, 3, 0]]
+            # NOTE: wxyz after loading from npz
+            body_quat_w_wxyz = torch.tensor(body_quat_w_raw, dtype=torch.float32, device=device)  # This is wxyz
+            self._body_quat_w = body_quat_w_wxyz[:, :, [1, 2, 3, 0]]  # Change to xyzw
 
             self._body_lin_vel_w = torch.tensor(body_lin_vel_w_raw, dtype=torch.float32, device=device)
             self._body_ang_vel_w = torch.tensor(body_ang_vel_w_raw, dtype=torch.float32, device=device)
 
+            # add object pos and quat
             self.has_object = "object_pos_w" in data
             if self.has_object:
                 self._object_pos_w = torch.tensor(data["object_pos_w"], dtype=torch.float32, device=device)
+                # NOTE: wxyz after loading from npz
                 object_quat_w = torch.tensor(data["object_quat_w"], dtype=torch.float32, device=device)
-                self._object_quat_w = object_quat_w[:, [1, 2, 3, 0]]
+                self._object_quat_w = object_quat_w[:, [1, 2, 3, 0]]  # Change to xyzw
                 self._object_lin_vel_w = torch.tensor(data["object_lin_vel_w"], dtype=torch.float32, device=device)
             else:
                 self._object_pos_w = torch.zeros(0, 3, device=device)
@@ -630,7 +632,8 @@ class MotionCommand(CommandTermBase):
             subset = torch.where(rand_vals < prob, start_idx, subset)
             self.time_steps[env_ids] = subset
 
-        # If at the last timestep of the assigned motion, step back by one
+        # If the motion is at the last timestep, set it to the second last timestep;
+        # Otherwise, update_tasks_callback will advance the timestep to the next timestep -> out of bounds error.
         already_last_timestep_mask = self.time_steps[env_ids] >= end_idx - 1
         self.time_steps[env_ids] = torch.where(already_last_timestep_mask, end_idx - 2, self.time_steps[env_ids])
 
