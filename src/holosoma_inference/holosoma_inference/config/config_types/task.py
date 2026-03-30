@@ -81,6 +81,9 @@ class TaskConfig:
     ros_vel_timeout: float = 1.0
     """Seconds without a velocity message before zeroing commands. Set to 0 to disable."""
 
+    auto_walk_on_vel_cmd: bool = False
+    """Automatically enter walking mode when a non-zero velocity command is received."""
+
     use_sim_time: bool = False
     """Use synchronized simulation time for WBT policies."""
 
