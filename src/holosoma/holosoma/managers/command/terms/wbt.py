@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import re
+from pathlib import Path
 from typing import Any, List
 
 import numpy as np
@@ -56,7 +58,17 @@ class MotionLoader:
         return torch.tensor(indexes, dtype=torch.long, device=device)
 
     # Expected holosoma NPZ keys
-    _REQUIRED_KEYS = {"fps", "joint_pos", "joint_vel", "body_pos_w", "body_quat_w", "body_lin_vel_w", "body_ang_vel_w", "body_names", "joint_names"}
+    _REQUIRED_KEYS = {
+        "fps",
+        "joint_pos",
+        "joint_vel",
+        "body_pos_w",
+        "body_quat_w",
+        "body_lin_vel_w",
+        "body_ang_vel_w",
+        "body_names",
+        "joint_names",
+    }
 
     def _load_data_from_motion_npz(self, motion_file: str, device: str) -> tuple[list[str], list[str]]:
         with cached_open(motion_file, "rb") as f, np.load(f) as data:
@@ -112,10 +124,12 @@ class MotionLoader:
             self._joint_pos = torch.tensor(joint_pos_raw[:, 7:], dtype=torch.float32, device=device)
             self._joint_vel = torch.tensor(joint_vel_raw[:, 6:], dtype=torch.float32, device=device)
 
-            assert len(joint_names) == self._joint_pos.shape[1], \
+            assert len(joint_names) == self._joint_pos.shape[1], (
                 f"Joint names ({len(joint_names)}) != joint_pos columns ({self._joint_pos.shape[1]}) in {motion_file}"
-            assert len(body_names) == body_pos_w_raw.shape[1], \
+            )
+            assert len(body_names) == body_pos_w_raw.shape[1], (
                 f"Body names ({len(body_names)}) != body_pos_w bodies ({body_pos_w_raw.shape[1]}) in {motion_file}"
+            )
 
             self._body_pos_w = torch.tensor(body_pos_w_raw, dtype=torch.float32, device=device)
 
@@ -228,16 +242,13 @@ class MultiMotionLoader:
         robot_joint_names: list[str],
         device: str = "cpu",
     ):
-        import glob
-        import os
-
         # Support comma-separated directories for combining multiple datasets
         dirs = [d.strip() for d in motion_dir.split(",")]
         motion_files = []
         for d in dirs:
-            d = os.path.expanduser(d)
-            files = sorted(glob.glob(os.path.join(d, "*.npz")))
-            logger.info(f"MultiMotionLoader: found {len(files)} .npz files in {d}")
+            expanded = os.path.expanduser(d)
+            files = sorted(str(p) for p in Path(expanded).glob("*.npz"))
+            logger.info(f"MultiMotionLoader: found {len(files)} .npz files in {expanded}")
             motion_files.extend(files)
         assert len(motion_files) > 0, f"No .npz files found in {motion_dir}"
         logger.info(f"MultiMotionLoader: loading {len(motion_files)} total motion files")
@@ -248,7 +259,7 @@ class MultiMotionLoader:
             try:
                 loader = MotionLoader(mf, robot_body_names, robot_joint_names, device=device)
                 loaders.append(loader)
-            except (KeyError, AssertionError, ValueError) as e:
+            except (KeyError, AssertionError, ValueError) as e:  # noqa: PERF203
                 # Skip files with incompatible format (e.g., missing body_names, wrong body count)
                 skipped += 1
                 if skipped <= 3:
@@ -265,12 +276,12 @@ class MultiMotionLoader:
         self._num_motions = len(loaders)
 
         # Concatenate all motion data
-        self._joint_pos = torch.cat([l._joint_pos for l in loaders], dim=0)
-        self._joint_vel = torch.cat([l._joint_vel for l in loaders], dim=0)
-        self._body_pos_w = torch.cat([l._body_pos_w for l in loaders], dim=0)
-        self._body_quat_w = torch.cat([l._body_quat_w for l in loaders], dim=0)
-        self._body_lin_vel_w = torch.cat([l._body_lin_vel_w for l in loaders], dim=0)
-        self._body_ang_vel_w = torch.cat([l._body_ang_vel_w for l in loaders], dim=0)
+        self._joint_pos = torch.cat([ld._joint_pos for ld in loaders], dim=0)
+        self._joint_vel = torch.cat([ld._joint_vel for ld in loaders], dim=0)
+        self._body_pos_w = torch.cat([ld._body_pos_w for ld in loaders], dim=0)
+        self._body_quat_w = torch.cat([ld._body_quat_w for ld in loaders], dim=0)
+        self._body_lin_vel_w = torch.cat([ld._body_lin_vel_w for ld in loaders], dim=0)
+        self._body_ang_vel_w = torch.cat([ld._body_ang_vel_w for ld in loaders], dim=0)
 
         # Use indexes from first loader (all loaders share the same robot)
         self._joint_indexes = loaders[0]._joint_indexes
@@ -279,11 +290,11 @@ class MultiMotionLoader:
         self.time_step_total = self._joint_pos.shape[0]
 
         # Object support: only if ALL motions have objects
-        self.has_object = all(l.has_object for l in loaders)
+        self.has_object = all(ld.has_object for ld in loaders)
         if self.has_object:
-            self._object_pos_w = torch.cat([l._object_pos_w for l in loaders], dim=0)
-            self._object_quat_w = torch.cat([l._object_quat_w for l in loaders], dim=0)
-            self._object_lin_vel_w = torch.cat([l._object_lin_vel_w for l in loaders], dim=0)
+            self._object_pos_w = torch.cat([ld._object_pos_w for ld in loaders], dim=0)
+            self._object_quat_w = torch.cat([ld._object_quat_w for ld in loaders], dim=0)
+            self._object_lin_vel_w = torch.cat([ld._object_lin_vel_w for ld in loaders], dim=0)
         else:
             self._object_pos_w = torch.zeros(0, 3, device=device)
             self._object_quat_w = torch.zeros(0, 4, device=device)
@@ -339,7 +350,7 @@ class MultiMotionLoader:
     def object_lin_vel_w(self) -> torch.Tensor:
         return self._object_lin_vel_w[:]
 
-    def extend_with_segments(self, segments: dict[str, torch.Tensor], prepend: bool) -> "MultiMotionLoader":
+    def extend_with_segments(self, segments: dict[str, torch.Tensor], prepend: bool) -> MultiMotionLoader:
         """Merge interpolated segments with motion data, mutating this MultiMotionLoader."""
         concat_targets = [
             ("joint_pos", "_joint_pos"),
@@ -370,12 +381,22 @@ class MultiMotionLoader:
         if prepend:
             self._motion_start_idx = self._motion_start_idx + added_frames
             self._motion_end_idx = self._motion_end_idx + added_frames
-            self._motion_start_idx = torch.cat([torch.tensor([0], dtype=torch.long, device=self._motion_start_idx.device), self._motion_start_idx])
-            self._motion_end_idx = torch.cat([torch.tensor([added_frames], dtype=torch.long, device=self._motion_end_idx.device), self._motion_end_idx])
+            dev = self._motion_start_idx.device
+            self._motion_start_idx = torch.cat(
+                [torch.tensor([0], dtype=torch.long, device=dev), self._motion_start_idx]
+            )
+            self._motion_end_idx = torch.cat(
+                [torch.tensor([added_frames], dtype=torch.long, device=dev), self._motion_end_idx]
+            )
         else:
             old_total = self.time_step_total
-            self._motion_start_idx = torch.cat([self._motion_start_idx, torch.tensor([old_total], dtype=torch.long, device=self._motion_start_idx.device)])
-            self._motion_end_idx = torch.cat([self._motion_end_idx, torch.tensor([old_total + added_frames], dtype=torch.long, device=self._motion_end_idx.device)])
+            dev = self._motion_start_idx.device
+            self._motion_start_idx = torch.cat(
+                [self._motion_start_idx, torch.tensor([old_total], dtype=torch.long, device=dev)]
+            )
+            self._motion_end_idx = torch.cat(
+                [self._motion_end_idx, torch.tensor([old_total + added_frames], dtype=torch.long, device=dev)]
+            )
 
         self.time_step_total = self._joint_pos.shape[0]
         self._num_motions = len(self._motion_start_idx)
@@ -511,6 +532,7 @@ class MotionCommand(CommandTermBase):
         assert self.motion_cfg.motion_file or self.motion_cfg.motion_dir, (
             "Either motion_file or motion_dir must be set in MotionConfig"
         )
+        self.motion: MotionLoader | MultiMotionLoader
         if self.motion_cfg.motion_dir:
             self.motion = MultiMotionLoader(
                 self.motion_cfg.motion_dir,
@@ -610,9 +632,7 @@ class MotionCommand(CommandTermBase):
 
         # If at the last timestep of the assigned motion, step back by one
         already_last_timestep_mask = self.time_steps[env_ids] >= end_idx - 1
-        self.time_steps[env_ids] = torch.where(
-            already_last_timestep_mask, end_idx - 2, self.time_steps[env_ids]
-        )
+        self.time_steps[env_ids] = torch.where(already_last_timestep_mask, end_idx - 2, self.time_steps[env_ids])
 
         # 1. Get the root/body poses from the motion data
         root_pos = self.root_pos_w[env_ids].clone()
