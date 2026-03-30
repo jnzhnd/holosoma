@@ -55,35 +55,30 @@ class MotionLoader:
             indexes.append(b_names.index(name))
         return torch.tensor(indexes, dtype=torch.long, device=device)
 
-    # Known 30-body order (TML format without contact points)
-    _TML_30_BODY_NAMES = [
-        "pelvis", "left_hip_pitch_link", "left_hip_roll_link", "left_hip_yaw_link",
-        "left_knee_link", "left_ankle_pitch_link", "left_ankle_roll_link",
-        "right_hip_pitch_link", "right_hip_roll_link", "right_hip_yaw_link",
-        "right_knee_link", "right_ankle_pitch_link", "right_ankle_roll_link",
-        "waist_yaw_link", "waist_roll_link", "torso_link",
-        "left_shoulder_pitch_link", "left_shoulder_roll_link", "left_shoulder_yaw_link",
-        "left_elbow_link", "left_wrist_roll_link", "left_wrist_pitch_link", "left_wrist_yaw_link",
-        "right_shoulder_pitch_link", "right_shoulder_roll_link", "right_shoulder_yaw_link",
-        "right_elbow_link", "right_wrist_roll_link", "right_wrist_pitch_link", "right_wrist_yaw_link",
-    ]
-    _TML_29_JOINT_NAMES = [
-        "left_hip_pitch_joint", "left_hip_roll_joint", "left_hip_yaw_joint",
-        "left_knee_joint", "left_ankle_pitch_joint", "left_ankle_roll_joint",
-        "right_hip_pitch_joint", "right_hip_roll_joint", "right_hip_yaw_joint",
-        "right_knee_joint", "right_ankle_pitch_joint", "right_ankle_roll_joint",
-        "waist_yaw_joint", "waist_roll_joint", "waist_pitch_joint",
-        "left_shoulder_pitch_joint", "left_shoulder_roll_joint", "left_shoulder_yaw_joint",
-        "left_elbow_joint", "left_wrist_roll_joint", "left_wrist_pitch_joint", "left_wrist_yaw_joint",
-        "right_shoulder_pitch_joint", "right_shoulder_roll_joint", "right_shoulder_yaw_joint",
-        "right_elbow_joint", "right_wrist_roll_joint", "right_wrist_pitch_joint", "right_wrist_yaw_joint",
-    ]
+    # Expected holosoma NPZ keys
+    _REQUIRED_KEYS = {"fps", "joint_pos", "joint_vel", "body_pos_w", "body_quat_w", "body_lin_vel_w", "body_ang_vel_w", "body_names", "joint_names"}
 
     def _load_data_from_motion_npz(self, motion_file: str, device: str) -> tuple[list[str], list[str]]:
         with cached_open(motion_file, "rb") as f, np.load(f) as data:
+            # Sanity check: warn if not in expected holosoma format
+            keys = set(data.files)
+            missing = self._REQUIRED_KEYS - keys
+            if missing:
+                logger.warning(
+                    f"Motion NPZ '{motion_file}' is missing expected holosoma keys: {missing}. "
+                    f"All motion data should be in holosoma format (with body_names, joint_names, "
+                    f"and root DOFs in joint_pos). Convert from TML/BeyondMimic first."
+                )
+                raise ValueError(
+                    f"Unsupported motion format in '{motion_file}': missing keys {missing}. "
+                    f"Please convert to holosoma format."
+                )
+
             self.fps = data["fps"]
 
-            has_names = "body_names" in data and "joint_names" in data
+            body_names = data["body_names"].tolist()
+            joint_names = data["joint_names"].tolist()
+
             joint_pos_raw = data["joint_pos"]
             joint_vel_raw = data["joint_vel"]
             body_pos_w_raw = data["body_pos_w"]
@@ -91,71 +86,51 @@ class MotionLoader:
             body_lin_vel_w_raw = data["body_lin_vel_w"]
             body_ang_vel_w_raw = data["body_ang_vel_w"]
 
-            if has_names:
-                # Holosoma format: has body_names, joint_pos includes root DOFs
-                body_names = data["body_names"].tolist()
-                joint_names = data["joint_names"].tolist()
-                # The first 7 joints_pos are [xyz, wxyz] of the pelvis, omit them
-                # The first 6 joints_vel are [vel_xyz, vel_wxyz] of the pelvis, omit them
-                self._joint_pos = torch.tensor(joint_pos_raw[:, 7:], dtype=torch.float32, device=device)
-                self._joint_vel = torch.tensor(joint_vel_raw[:, 6:], dtype=torch.float32, device=device)
-                assert len(joint_names) == self._joint_pos.shape[1], "Joint names in motion data does not match"
-                assert len(body_names) == body_pos_w_raw.shape[1], "Body names in motion data does not match"
-            else:
-                # TML format: no body_names, joint_pos already stripped of root DOFs
-                body_names = self._TML_30_BODY_NAMES
-                joint_names = self._TML_29_JOINT_NAMES
-                num_bodies = body_pos_w_raw.shape[1]
-                num_joints = joint_pos_raw.shape[1]
+            # Holosoma format: joint_pos includes root DOFs [xyz, wxyz] as first 7 values
+            # joint_vel includes root velocity [vel_xyz, vel_wxyz] as first 6 values
+            num_joint_cols = joint_pos_raw.shape[1]
+            num_vel_cols = joint_vel_raw.shape[1]
+            num_bodies = body_pos_w_raw.shape[1]
 
-                if num_joints == 29:
-                    # Already stripped of root DOFs
-                    self._joint_pos = torch.tensor(joint_pos_raw, dtype=torch.float32, device=device)
-                    self._joint_vel = torch.tensor(joint_vel_raw, dtype=torch.float32, device=device)
-                else:
-                    # Has root DOFs, strip them
-                    self._joint_pos = torch.tensor(joint_pos_raw[:, 7:], dtype=torch.float32, device=device)
-                    self._joint_vel = torch.tensor(joint_vel_raw[:, 6:], dtype=torch.float32, device=device)
+            if num_joint_cols != len(joint_names) + 7:
+                logger.warning(
+                    f"Unexpected joint_pos columns: got {num_joint_cols}, expected {len(joint_names) + 7} "
+                    f"(= {len(joint_names)} joints + 7 root DOFs). File: {motion_file}"
+                )
+            if num_vel_cols != len(joint_names) + 6:
+                logger.warning(
+                    f"Unexpected joint_vel columns: got {num_vel_cols}, expected {len(joint_names) + 6} "
+                    f"(= {len(joint_names)} joints + 6 root DOFs). File: {motion_file}"
+                )
+            if num_bodies != len(body_names):
+                logger.warning(
+                    f"Body count mismatch: body_pos_w has {num_bodies} bodies but body_names has "
+                    f"{len(body_names)}. File: {motion_file}"
+                )
 
-                if num_bodies == 30:
-                    # TML 30-body format — pad to 32 by inserting contact point bodies
-                    # Contact points duplicate their parent ankle data:
-                    #   left_foot_contact_point (idx 7) = left_ankle_roll_link (idx 6 in 30-body)
-                    #   right_foot_contact_point (idx 14) = right_ankle_roll_link (idx 12 in 30-body)
-                    body_pos_w_raw = self._pad_30_to_32_bodies(body_pos_w_raw)
-                    body_quat_w_raw = self._pad_30_to_32_bodies(body_quat_w_raw)
-                    body_lin_vel_w_raw = self._pad_30_to_32_bodies(body_lin_vel_w_raw)
-                    body_ang_vel_w_raw = self._pad_30_to_32_bodies(body_ang_vel_w_raw)
-                    body_names = [
-                        "pelvis", "left_hip_pitch_link", "left_hip_roll_link", "left_hip_yaw_link",
-                        "left_knee_link", "left_ankle_pitch_link", "left_ankle_roll_link",
-                        "left_foot_contact_point",
-                        "right_hip_pitch_link", "right_hip_roll_link", "right_hip_yaw_link",
-                        "right_knee_link", "right_ankle_pitch_link", "right_ankle_roll_link",
-                        "right_foot_contact_point",
-                        "waist_yaw_link", "waist_roll_link", "torso_link",
-                        "left_shoulder_pitch_link", "left_shoulder_roll_link", "left_shoulder_yaw_link",
-                        "left_elbow_link", "left_wrist_roll_link", "left_wrist_pitch_link", "left_wrist_yaw_link",
-                        "right_shoulder_pitch_link", "right_shoulder_roll_link", "right_shoulder_yaw_link",
-                        "right_elbow_link", "right_wrist_roll_link", "right_wrist_pitch_link", "right_wrist_yaw_link",
-                    ]
+            # Strip root DOFs
+            self._joint_pos = torch.tensor(joint_pos_raw[:, 7:], dtype=torch.float32, device=device)
+            self._joint_vel = torch.tensor(joint_vel_raw[:, 6:], dtype=torch.float32, device=device)
+
+            assert len(joint_names) == self._joint_pos.shape[1], \
+                f"Joint names ({len(joint_names)}) != joint_pos columns ({self._joint_pos.shape[1]}) in {motion_file}"
+            assert len(body_names) == body_pos_w_raw.shape[1], \
+                f"Body names ({len(body_names)}) != body_pos_w bodies ({body_pos_w_raw.shape[1]}) in {motion_file}"
 
             self._body_pos_w = torch.tensor(body_pos_w_raw, dtype=torch.float32, device=device)
 
-            # NOTE: wxyz after loading from npz
+            # Quaternions stored as wxyz in NPZ, convert to xyzw
             body_quat_w_wxyz = torch.tensor(body_quat_w_raw, dtype=torch.float32, device=device)
-            self._body_quat_w = body_quat_w_wxyz[:, :, [1, 2, 3, 0]]  # Change to xyzw
+            self._body_quat_w = body_quat_w_wxyz[:, :, [1, 2, 3, 0]]
 
             self._body_lin_vel_w = torch.tensor(body_lin_vel_w_raw, dtype=torch.float32, device=device)
             self._body_ang_vel_w = torch.tensor(body_ang_vel_w_raw, dtype=torch.float32, device=device)
 
-            # add object pos and quat
             self.has_object = "object_pos_w" in data
             if self.has_object:
-                # NOTE: wxyz after loading from npz
                 self._object_pos_w = torch.tensor(data["object_pos_w"], dtype=torch.float32, device=device)
                 object_quat_w = torch.tensor(data["object_quat_w"], dtype=torch.float32, device=device)
-                self._object_quat_w = object_quat_w[:, [1, 2, 3, 0]]  # Change to xyzw
+                self._object_quat_w = object_quat_w[:, [1, 2, 3, 0]]
                 self._object_lin_vel_w = torch.tensor(data["object_lin_vel_w"], dtype=torch.float32, device=device)
             else:
                 self._object_pos_w = torch.zeros(0, 3, device=device)
@@ -198,25 +173,6 @@ class MotionLoader:
     @property
     def object_lin_vel_w(self) -> torch.Tensor:
         return self._object_lin_vel_w[:]
-
-    @staticmethod
-    def _pad_30_to_32_bodies(arr: np.ndarray) -> np.ndarray:
-        """Pad 30-body TML format to 32-body holosoma format by inserting contact point bodies.
-
-        In 30-body: left_ankle_roll_link is at idx 6, right_ankle_roll_link is at idx 12.
-        In 32-body: insert left_foot_contact_point after idx 6 (at 7),
-                    insert right_foot_contact_point after idx 13 (at 14).
-        Contact bodies duplicate ankle data.
-        """
-        T = arr.shape[0]
-        rest_shape = arr.shape[2:]  # e.g., (3,) or (4,)
-        # Insert left_foot_contact_point at position 7 (copy of left_ankle_roll at idx 6)
-        left_contact = arr[:, 6:7]  # (T, 1, ...)
-        arr = np.concatenate([arr[:, :7], left_contact, arr[:, 7:]], axis=1)  # now 31 bodies
-        # Insert right_foot_contact_point at position 14 (copy of right_ankle_roll at idx 13)
-        right_contact = arr[:, 13:14]  # (T, 1, ...)
-        arr = np.concatenate([arr[:, :14], right_contact, arr[:, 14:]], axis=1)  # now 32 bodies
-        return arr
 
     @property
     def num_motions(self) -> int:
@@ -292,7 +248,7 @@ class MultiMotionLoader:
             try:
                 loader = MotionLoader(mf, robot_body_names, robot_joint_names, device=device)
                 loaders.append(loader)
-            except (KeyError, AssertionError) as e:
+            except (KeyError, AssertionError, ValueError) as e:
                 # Skip files with incompatible format (e.g., missing body_names, wrong body count)
                 skipped += 1
                 if skipped <= 3:
@@ -382,6 +338,48 @@ class MultiMotionLoader:
     @property
     def object_lin_vel_w(self) -> torch.Tensor:
         return self._object_lin_vel_w[:]
+
+    def extend_with_segments(self, segments: dict[str, torch.Tensor], prepend: bool) -> "MultiMotionLoader":
+        """Merge interpolated segments with motion data, mutating this MultiMotionLoader."""
+        concat_targets = [
+            ("joint_pos", "_joint_pos"),
+            ("joint_vel", "_joint_vel"),
+            ("body_pos", "_body_pos_w"),
+            ("body_quat", "_body_quat_w"),
+            ("body_lin_vel", "_body_lin_vel_w"),
+            ("body_ang_vel", "_body_ang_vel_w"),
+        ]
+        if self.has_object:
+            concat_targets.extend(
+                [
+                    ("object_pos", "_object_pos_w"),
+                    ("object_quat", "_object_quat_w"),
+                    ("object_lin_vel", "_object_lin_vel_w"),
+                ]
+            )
+
+        added_frames = 0
+        for seg_key, attr_name in concat_targets:
+            existing = getattr(self, attr_name)
+            tensors = (segments[seg_key], existing) if prepend else (existing, segments[seg_key])
+            setattr(self, attr_name, torch.cat(tensors, dim=0))
+            if added_frames == 0:
+                added_frames = segments[seg_key].shape[0]
+
+        # Update boundaries — shift all motion boundaries if prepending
+        if prepend:
+            self._motion_start_idx = self._motion_start_idx + added_frames
+            self._motion_end_idx = self._motion_end_idx + added_frames
+            self._motion_start_idx = torch.cat([torch.tensor([0], dtype=torch.long, device=self._motion_start_idx.device), self._motion_start_idx])
+            self._motion_end_idx = torch.cat([torch.tensor([added_frames], dtype=torch.long, device=self._motion_end_idx.device), self._motion_end_idx])
+        else:
+            old_total = self.time_step_total
+            self._motion_start_idx = torch.cat([self._motion_start_idx, torch.tensor([old_total], dtype=torch.long, device=self._motion_start_idx.device)])
+            self._motion_end_idx = torch.cat([self._motion_end_idx, torch.tensor([old_total + added_frames], dtype=torch.long, device=self._motion_end_idx.device)])
+
+        self.time_step_total = self._joint_pos.shape[0]
+        self._num_motions = len(self._motion_start_idx)
+        return self
 
 
 class AdaptiveTimestepsSampler:
