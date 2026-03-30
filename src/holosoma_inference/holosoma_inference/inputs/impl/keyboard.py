@@ -181,6 +181,16 @@ class KeyboardInput(InputProvider):
         self._ang_vel[:] = 0.0
 
     def poll_commands(self) -> list[StateCommand]:
+        # Drain queue for any commands not yet processed (e.g. when this
+        # provider is used for commands only, without poll_velocity calls).
+        while True:
+            try:
+                keycode = self._queue.popleft()
+            except IndexError:
+                break
+            cmd = self._mapping.get(keycode)
+            if cmd is not None:
+                self._pending_commands.append(cmd)
         commands = self._pending_commands
         self._pending_commands = []
         return commands
