@@ -254,7 +254,10 @@ class StreamDeckInput:
             return
         target = "PRIMARY" if active_label == "secondary" else "SECONDARY"
         self._draw_key(
-            self._SWITCH_MODE_KEY, f"SWITCH\n{target}", _BLUE, (255, 255, 255),
+            self._SWITCH_MODE_KEY,
+            f"SWITCH\n{target}",
+            _BLUE,
+            (255, 255, 255),
             font=self._font_small,
         )
 
