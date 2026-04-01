@@ -82,21 +82,19 @@ class StreamDeckInput:
         self._deck.set_brightness(80)
         self._deck.set_key_callback(self._on_key)
 
-        self._draw_labels(PILHelper)
+        self._draw_labels(pil_helper=PILHelper)
         logger.info(
             "Stream Deck {} opened ({} keys)",
             self._deck.deck_type(),
             self._deck.key_count(),
         )
 
-    def _draw_labels(self, PILHelper) -> None:
+    def _draw_labels(self, pil_helper) -> None:
         """Draw command labels on mapped keys, dim grey on unmapped ones."""
-        from PIL import Image, ImageDraw, ImageFont
+        from PIL import ImageDraw, ImageFont
 
         try:
-            font = ImageFont.truetype(
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14
-            )
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
         except OSError:
             font = ImageFont.load_default()
 
@@ -109,7 +107,7 @@ class StreamDeckInput:
                 bg = (40, 40, 40)
                 label = ""
 
-            img = PILHelper.create_image(self._deck)
+            img = pil_helper.create_image(self._deck)
             draw = ImageDraw.Draw(img)
             draw.rectangle(((0, 0), img.size), fill=bg)
 
@@ -120,7 +118,7 @@ class StreamDeckInput:
                 y = (img.height - th) // 2
                 draw.text((x, y), label, font=font, fill="white", align="center")
 
-            self._deck.set_key_image(k, PILHelper.to_native_format(self._deck, img))
+            self._deck.set_key_image(k, pil_helper.to_native_format(self._deck, img))
 
     def _on_key(self, deck, key: int, pressed: bool) -> None:
         if not pressed:
