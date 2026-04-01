@@ -754,6 +754,9 @@ class BasePolicy:
         elif cmd == StateCommand.NEXT_POLICY:
             next_index = (self.active_policy_index + 1) % len(self.model_paths)
             self._activate_policy(next_index)
+        elif cmd == StateCommand.PREV_POLICY:
+            prev_index = (self.active_policy_index - 1) % len(self.model_paths)
+            self._activate_policy(prev_index)
         elif cmd in STATE_COMMAND_TO_POLICY_INDEX:
             index = STATE_COMMAND_TO_POLICY_INDEX[cmd]
             if index != self.active_policy_index and 0 <= index < len(self.model_paths):
@@ -768,6 +771,16 @@ class BasePolicy:
             self.interface.kp_level -= 0.01
         elif cmd == StateCommand.KP_RESET:
             self.interface.kp_level = 1.0
+        elif cmd == StateCommand.KD_UP:
+            self.interface.kd_level += 0.1
+        elif cmd == StateCommand.KD_DOWN:
+            self.interface.kd_level -= 0.1
+        elif cmd == StateCommand.KD_UP_FINE:
+            self.interface.kd_level += 0.01
+        elif cmd == StateCommand.KD_DOWN_FINE:
+            self.interface.kd_level -= 0.01
+        elif cmd == StateCommand.KD_RESET:
+            self.interface.kd_level = 1.0
 
     # ============================================================================
     # Control Action Methods
