@@ -31,4 +31,9 @@ def create_input(policy: BasePolicy, source: InputSource, role: str) -> VelCmdPr
             vel_timeout=policy.config.task.ros_vel_timeout,
         )
 
+    if source == "streamdeck":
+        from holosoma_inference.inputs.impl.streamdeck import StreamDeckInput
+
+        return StreamDeckInput()
+
     raise ValueError(f"Unknown input source: {source}")
