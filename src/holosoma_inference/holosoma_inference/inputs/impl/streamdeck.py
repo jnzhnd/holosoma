@@ -100,8 +100,8 @@ STREAMDECK_BUTTONS: dict[int, ButtonStyle] = {
     _pos(2, 1): ButtonStyle(StateCommand.KD_RESET, "KD\nRESET", _DARK, (200, 200, 200)),
     _pos(3, 1): ButtonStyle(StateCommand.KD_DOWN_FINE, "KD\n−", _ROSE),
     # Col 2 — locomotion helpers
-    _pos(0, 2): ButtonStyle(StateCommand.STAND_TOGGLE, "STAND", _BLUE),
-    _pos(1, 2): ButtonStyle(StateCommand.ZERO_VELOCITY, "ZERO\nVEL", _BLUE),
+    _pos(0, 2): ButtonStyle(StateCommand.STAND_TOGGLE, "STAND↔\nWALK", _BLUE),
+    _pos(1, 2): ButtonStyle(StateCommand.ZERO_VELOCITY, "ZERO\nVELOCITY", _BLUE),
     _pos(2, 2): ButtonStyle(StateCommand.SWITCH_MODE, "SWITCH\nMODE", _BLUE),
     _pos(3, 2): ButtonStyle(StateCommand.START_MOTION_CLIP, "MOTION\nCLIP", _BLUE),
     # Cols 3-5 — velocity d-pad
