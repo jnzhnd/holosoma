@@ -70,6 +70,7 @@ class DualModePolicy:
         self.active_label = "primary"
 
         self._setup_command_intercept()
+        self._update_streamdeck_mode_label()
         logger.info(colored("Dual-mode ready. Press X (joystick) or x (keyboard) to switch policies.", "magenta"))
 
     def _setup_command_intercept(self):
@@ -102,6 +103,15 @@ class DualModePolicy:
         self.primary._dispatch_command = patched_dispatch
         self.secondary._dispatch_command = patched_dispatch
 
+    def _update_streamdeck_mode_label(self):
+        """Update the Stream Deck SWITCH MODE button to reflect current state."""
+        from holosoma_inference.inputs.impl.streamdeck import StreamDeckInput
+
+        for policy in (self.primary, self.secondary):
+            provider = getattr(policy, "_command_provider", None)
+            if isinstance(provider, StreamDeckInput):
+                provider.update_mode_display(self.active_label)
+
     def _handle_mode_switch(self):
         """Switch from active to inactive policy."""
         self.active._handle_stop_policy()
@@ -128,6 +138,8 @@ class DualModePolicy:
         # Re-initialize phase and activate
         self.active._init_phase_components()
         self.active._handle_start_policy()
+
+        self._update_streamdeck_mode_label()
 
         logger.info(
             colored(

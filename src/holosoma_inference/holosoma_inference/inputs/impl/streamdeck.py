@@ -45,6 +45,7 @@ class ButtonStyle:
     label: str
     bg: tuple[int, int, int]
     fg: tuple[int, int, int] = (255, 255, 255)
+    small: bool = False
 
 
 # Colour palette
@@ -101,8 +102,8 @@ STREAMDECK_BUTTONS: dict[int, ButtonStyle] = {
     _pos(3, 1): ButtonStyle(StateCommand.KD_DOWN_FINE, "KD\n−", _ROSE),
     # Col 2 — locomotion helpers
     _pos(0, 2): ButtonStyle(StateCommand.STAND_TOGGLE, "STAND↔\nWALK", _BLUE),
-    _pos(1, 2): ButtonStyle(StateCommand.ZERO_VELOCITY, "ZERO\nVELOCITY", _BLUE),
-    _pos(2, 2): ButtonStyle(StateCommand.SWITCH_MODE, "SWITCH\nMODE", _BLUE),
+    _pos(1, 2): ButtonStyle(StateCommand.ZERO_VELOCITY, "ZERO\nVELOCITY", _BLUE, small=True),
+    _pos(2, 2): ButtonStyle(StateCommand.SWITCH_MODE, "SWITCH\nMODE", _BLUE, small=True),
     _pos(3, 2): ButtonStyle(StateCommand.START_MOTION_CLIP, "MOTION\nCLIP", _BLUE),
     # Cols 3-5 — velocity d-pad
     #   row 1: ↶ yaw L,  ↑ fwd,   ↷ yaw R
@@ -114,8 +115,8 @@ STREAMDECK_BUTTONS: dict[int, ButtonStyle] = {
     _pos(2, 4): ButtonStyle(None, "\u2193", _SLATE),  # bwd
     _pos(2, 5): ButtonStyle(None, "\u2192", _SLATE),  # right
     # Col 6 — policy navigation
-    _pos(0, 6): ButtonStyle(StateCommand.PREV_POLICY, "POL\n\u25b2", _PURPLE),
-    _pos(3, 6): ButtonStyle(StateCommand.NEXT_POLICY, "POL\n\u25bc", _PURPLE),
+    _pos(0, 6): ButtonStyle(StateCommand.PREV_POLICY, "Next\npolicy", _PURPLE),
+    _pos(3, 6): ButtonStyle(StateCommand.NEXT_POLICY, "Previous\n policy", _PURPLE),
     # Col 7 — lifecycle
     _pos(0, 7): ButtonStyle(StateCommand.START, "START", _GREEN),
     _pos(1, 7): ButtonStyle(StateCommand.STOP, "STOP", _ORANGE),
@@ -151,6 +152,7 @@ class StreamDeckInput:
 
     _KP_DISPLAY_KEY = _pos(1, 0)
     _KD_DISPLAY_KEY = _pos(1, 1)
+    _SWITCH_MODE_KEY = _pos(2, 2)
 
     def __init__(self) -> None:
         self._deck = None
@@ -195,10 +197,12 @@ class StreamDeckInput:
 
         _font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
         try:
-            self._font = ImageFont.truetype(_font_path, 14)
-            self._font_large = ImageFont.truetype(_font_path, 32)
+            self._font = ImageFont.truetype(_font_path, 18)
+            self._font_small = ImageFont.truetype(_font_path, 14)
+            self._font_large = ImageFont.truetype(_font_path, 48)
         except OSError:
             self._font = ImageFont.load_default()
+            self._font_small = self._font
             self._font_large = self._font
 
         for k in range(self._deck.key_count()):
@@ -206,7 +210,8 @@ class StreamDeckInput:
             bg = btn.bg if btn else _DARK
             fg = btn.fg if btn else (80, 80, 80)
             label = btn.label if btn else ""
-            self._draw_key(k, label, bg, fg)
+            font = self._font_small if btn and btn.small else None
+            self._draw_key(k, label, bg, fg, font=font)
 
     def _draw_key(
         self,
@@ -242,6 +247,16 @@ class StreamDeckInput:
             return
         self._draw_key(self._KP_DISPLAY_KEY, f"KP\n{kp_level:.2f}", _DARK, _TEAL)
         self._draw_key(self._KD_DISPLAY_KEY, f"KD\n{kd_level:.2f}", _DARK, _ROSE)
+
+    def update_mode_display(self, active_label: str) -> None:
+        """Redraw the SWITCH MODE button to show which mode will be switched to."""
+        if self._deck is None:
+            return
+        target = "PRIMARY" if active_label == "secondary" else "SECONDARY"
+        self._draw_key(
+            self._SWITCH_MODE_KEY, f"SWITCH\n{target}", _BLUE, (255, 255, 255),
+            font=self._font_small,
+        )
 
     def _on_key(self, deck, key: int, pressed: bool) -> None:
         if not pressed:
