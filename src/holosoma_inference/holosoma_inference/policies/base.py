@@ -812,15 +812,23 @@ class BasePolicy:
             self.interface.no_action = 0
 
     def _print_control_status(self):
-        """Print current control status."""
+        """Print current control status and update input display if supported."""
         self.logger.info("------------ Control Status ------------")
         if self.active_model_path:
             total = len(self.model_paths)
             name = Path(self.active_model_path).name
             debug_str = (
-                f"Active policy [{self.active_policy_index + 1}/{total}]: {name} Kp level {self.interface.kp_level:.2f}"
+                f"Active policy [{self.active_policy_index + 1}/{total}]: {name}"
+                f" Kp level {self.interface.kp_level:.2f}"
+                f" Kd level {self.interface.kd_level:.2f}"
             )
             self.logger.info(debug_str)
+
+        if hasattr(self._command_provider, "update_gain_display"):
+            self._command_provider.update_gain_display(
+                self.interface.kp_level,
+                self.interface.kd_level,
+            )
 
     # ============================================================================
     # Main Run Method
